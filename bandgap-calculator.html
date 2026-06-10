@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>半导体带隙计算器 — Tauc Plot 方法</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f5f6fa; color: #2c3e50; line-height: 1.6;
+  }
+  .container { max-width: 1300px; margin: 0 auto; padding: 16px 20px; }
+  .header { background: linear-gradient(135deg, #1e3a5f, #2d5a87, #3b7cb8); color: #fff; padding: 24px 32px 20px; margin-bottom: 24px; }
+  .header h1 { font-size: 21px; font-weight: 700; }
+  .header p { font-size: 13px; opacity: .8; margin-top: 2px; }
+  .card {
+    background: #fff; border-radius: 12px; padding: 20px 24px;
+    margin-bottom: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .card h2 { font-size: 1.15rem; margin-bottom: 14px; color: #1a1a2e; border-bottom: 2px solid #eef; padding-bottom: 8px; }
+  .form-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; margin-bottom: 12px; }
+  .form-group { display: flex; flex-direction: column; min-width: 140px; }
+  .form-group label { font-size: 0.82rem; font-weight: 600; color: #555; margin-bottom: 4px; }
+  .form-group input, .form-group select {
+    padding: 8px 12px; border: 1px solid #d0d5e0; border-radius: 6px;
+    font-size: 0.9rem; transition: border-color 0.2s;
+  }
+  .form-group input:focus, .form-group select:focus { border-color: #0f3460; outline: none; }
+  textarea {
+    width: 100%; min-height: 160px; padding: 10px 12px; border: 1px solid #d0d5e0;
+    border-radius: 6px; font-family: 'Courier New', monospace; font-size: 0.85rem;
+    resize: vertical; line-height: 1.5;
+  }
+  textarea:focus { border-color: #0f3460; outline: none; }
+  .btn {
+    padding: 9px 20px; border: none; border-radius: 6px; font-size: 0.9rem;
+    font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn-primary { background: #0f3460; color: #fff; }
+  .btn-primary:hover { background: #1a4a80; }
+  .btn-outline { background: #fff; color: #0f3460; border: 1.5px solid #0f3460; }
+  .btn-outline:hover { background: #eef3fa; }
+  .btn-sm { padding: 5px 12px; font-size: 0.8rem; }
+  .result-box {
+    background: #f0f4ff; border: 1px solid #d0daf0; border-radius: 10px;
+    padding: 16px 20px; margin-top: 12px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center;
+  }
+  .result-item { text-align: center; }
+  .result-item .value { font-size: 1.6rem; font-weight: 700; color: #0f3460; }
+  .result-item .label { font-size: 0.75rem; color: #777; margin-top: 2px; }
+  .chart-container { position: relative; width: 100%; aspect-ratio: 16/10; min-height: 420px; }
+  canvas { width: 100%; height: 100%; }
+  .btn-group { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .tabs { display: flex; gap: 0; margin-bottom: 16px; }
+  .tab {
+    padding: 8px 20px; border: 1px solid #d0d5e0; background: #f8f9fc;
+    cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: all 0.15s;
+  }
+  .tab:first-child { border-radius: 6px 0 0 6px; }
+  .tab:last-child { border-radius: 0 6px 6px 0; }
+  .tab.active { background: #0f3460; color: #fff; border-color: #0f3460; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  .note {
+    font-size: 0.8rem; color: #888; background: #fafbfc; border-left: 3px solid #ddd;
+    padding: 8px 12px; border-radius: 0 6px 6px 0; margin-top: 8px;
+  }
+  .data-preview {
+    max-height: 200px; overflow-y: auto; margin-top: 8px; font-size: 0.8rem;
+  }
+  .data-preview table { width: 100%; border-collapse: collapse; }
+  .data-preview th, .data-preview td {
+    padding: 4px 10px; border: 1px solid #e0e0e0; text-align: right;
+  }
+  .data-preview th { background: #f0f4ff; font-weight: 600; position: sticky; top: 0; }
+  .warning-banner {
+    background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px;
+    padding: 8px 14px; font-size: 0.82rem; color: #856404; margin-bottom: 12px;
+    display: none;
+  }
+  footer { text-align: center; font-size: 0.78rem; color: #aaa; padding: 20px 0; }
+  .btn-help { padding: 8px 18px; border-radius: 20px; font-size: 13px; cursor: pointer; border: 1.5px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.15); color: #fff; font-weight: 500; transition: all 0.15s; white-space: nowrap; backdrop-filter: blur(4px); }
+  .btn-help:hover { background: rgba(255,255,255,0.28); border-color: rgba(255,255,255,0.75); }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.show { display: flex; }
+  .modal-box { background: #fff; border-radius: 14px; max-width: 680px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+  .modal-box h2 { font-size: 1.2rem; font-weight: 700; color: #1e293b; padding: 22px 26px 16px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; }
+  .modal-box h2 .modal-close { background: none; border: none; font-size: 1.3rem; color: #94a3b8; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+  .modal-box h2 .modal-close:hover { background: #f1f5f9; color: #475569; }
+  .modal-body { padding: 20px 26px 28px; font-size: 0.88rem; line-height: 1.8; color: #475569; }
+  .modal-body h3 { font-size: 0.95rem; font-weight: 600; color: #334155; margin: 16px 0 6px; }
+  .modal-body h3:first-child { margin-top: 0; }
+  .modal-body ul { padding-left: 20px; margin: 6px 0; }
+  .modal-body li { margin-bottom: 4px; }
+  .modal-body .tip { background: #f0f4ff; border-left: 3px solid #0f3460; padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 10px 0; font-size: 0.84rem; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+    <div>
+      <h1>🔬 半导体带隙计算器</h1>
+      <p>Tauc Plot 方法 · 透光率 → 带隙能量自动拟合</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button class="btn-help" id="btnHelp">📖 使用方法</button>
+      <a href="index.html" style="display:inline-flex;align-items:center;gap:4px;padding:8px 16px;background:rgba(255,255,255,0.18);color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap;transition:all 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.18)'">← 返回主页</a>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- 数据输入卡 -->
+  <div class="card" id="input-card">
+    <h2>📥 数据输入</h2>
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('manual')">手动输入</div>
+      <div class="tab" onclick="switchTab('file')">文件上传</div>
+      <div class="tab" onclick="switchTab('demo')">示例数据</div>
+    </div>
+
+    <div id="tab-manual" class="tab-content active">
+      <p style="font-size:0.85rem;color:#666;margin-bottom:8px;" id="manual-hint">每行输入：波长(nm) 透光率(%)，空格或 Tab 分隔</p>
+      <textarea id="manual-data" placeholder="例：&#10;300 5.2&#10;350 12.8&#10;400 28.5&#10;450 48.1&#10;500 63.4&#10;550 72.9&#10;600 78.6&#10;650 82.1&#10;700 84.3&#10;750 85.5&#10;800 86.2" oninput="scheduleCalc()"></textarea>
+    </div>
+
+    <div id="tab-file" class="tab-content">
+      <p style="font-size:0.85rem;color:#666;margin-bottom:8px;">支持 .txt / .csv / .xlsx，每行：波长(nm), 数值</p>
+      <input type="file" id="file-input" accept=".txt,.csv,.xlsx" onchange="handleFile(event)" style="margin-bottom:8px;">
+      <div id="file-preview" class="data-preview"></div>
+    </div>
+
+    <div id="tab-demo" class="tab-content">
+      <p style="font-size:0.85rem;color:#666;margin-bottom:8px;" id="demo-desc">ZnO 薄膜典型透光光谱（直接带隙约 3.25 eV，数据类型需选"透光率"）</p>
+      <div id="demo-warning" class="warning-banner">⚠️ 示例数据是<b>透光率</b>光谱，当前数据类型为<b id="demo-warn-type"></b>，结果将无意义。请将数据类型切回"透光率 T%"，或手动输入对应类型的数据。</div>
+      <div class="data-preview" id="demo-preview"></div>
+    </div>
+  </div>
+
+  <!-- 参数设置卡 -->
+  <div class="card">
+    <h2>⚙️ 参数设置</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label>数据类型</label>
+        <select id="data-type" onchange="onDataTypeChange()">
+          <option value="transmittance">透光率 T%</option>
+          <option value="absorbance">吸光度 A</option>
+          <option value="absorption">吸收系数 α (cm⁻¹)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>带隙类型</label>
+        <select id="gap-type" onchange="calculate()">
+          <option value="direct">直接带隙 (n=1/2)</option>
+          <option value="indirect">间接带隙 (n=2)</option>
+          <option value="direct-forbidden">直接禁戒 (n=3/2)</option>
+        </select>
+      </div>
+      <div class="form-group" style="min-width:170px;">
+        <label>材料预设</label>
+        <select id="material-preset" onchange="applyPreset()">
+          <option value="">— 手动设置 —</option>
+          <option value="zno">ZnO (直接, 3.2–3.5 eV)</option>
+          <option value="tio2-a">TiO₂ 锐钛矿 (间接, 3.2–3.6 eV)</option>
+          <option value="tio2-r">TiO₂ 金红石 (直接, 2.9–3.3 eV)</option>
+          <option value="sno2">SnO₂ (直接, 3.5–3.9 eV)</option>
+          <option value="wo3">WO₃ (间接, 2.4–3.0 eV)</option>
+          <option value="fe2o3">α-Fe₂O₃ (直接, 2.1–2.5 eV)</option>
+          <option value="cds">CdS (直接, 2.3–2.7 eV)</option>
+          <option value="gan">GaN (直接, 3.3–3.7 eV)</option>
+          <option value="si">Si (间接, 1.1–1.4 eV)</option>
+          <option value="cu2o">Cu₂O (直接, 2.1–2.5 eV)</option>
+          <option value="bivo4">BiVO₄ (直接, 2.4–2.8 eV)</option>
+          <option value="aln">AlN (直接, 6.0–6.3 eV)</option>
+          <option value="al2o3">Al₂O₃ (直接, 6.5–7.5 eV)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 膜厚参数 -->
+    <div class="form-row">
+      <div class="form-group" style="min-width:140px;">
+        <label>薄膜厚度 d (nm)</label>
+        <input type="number" id="film-thickness" value="" min="1" max="100000" step="1" placeholder="直接使用比例" onchange="onThicknessChange()" oninput="onThicknessChange()">
+      </div>
+      <div class="form-group" style="min-width:110px;">
+        <label>表面反射率 R</label>
+        <input type="number" id="reflectance" value="" min="0" max="0.5" step="0.001" placeholder="默认 0 (忽略)" onchange="scheduleCalc()">
+      </div>
+      <div class="form-group" style="min-width:160px;">
+        <label style="visibility:hidden;">.</label>
+        <span id="thickness-hint" style="font-size:0.78rem;color:#999;">输入膜厚后 α = −ln(T/(1−R)²)/d，纵轴获得绝对单位</span>
+      </div>
+    </div>
+
+    <!-- 数据区间过滤 -->
+    <div class="form-row">
+      <div class="form-group" style="min-width:170px;">
+        <label>波段预设</label>
+        <select id="band-preset" onchange="applyBandPreset()">
+          <option value="">— 全部数据 —</option>
+          <option value="uvc">UV-C (200–280 nm)</option>
+          <option value="uvb">UV-B (280–315 nm)</option>
+          <option value="uva">UV-A (315–400 nm)</option>
+          <option value="vis">可见光 (400–700 nm)</option>
+          <option value="nir">近红外 (700–1100 nm)</option>
+          <option value="uv-vis">紫外+可见 (200–700 nm)</option>
+          <option value="vis-nir">可见+近红外 (400–1100 nm)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>波长范围下限 (nm)</label>
+        <input type="number" id="wl-min" value="" min="100" max="2000" step="1" placeholder="不限制" onchange="onWlRangeChange()">
+      </div>
+      <div class="form-group">
+        <label>波长范围上限 (nm)</label>
+        <input type="number" id="wl-max" value="" min="100" max="2000" step="1" placeholder="不限制" onchange="onWlRangeChange()">
+      </div>
+      <div class="form-group">
+        <label style="visibility:hidden;">.</label>
+        <button class="btn btn-outline btn-sm" onclick="clearWlRange()" style="margin-top:2px;">🗑 清除过滤</button>
+      </div>
+    </div>
+
+    <!-- 拟合范围 -->
+    <div class="form-row">
+      <div class="form-group">
+        <label>拟合范围下限 (eV) <span style="font-weight:400;color:#999;" id="fit-min-nm"></span></label>
+        <input type="number" id="fit-min" value="2.0" min="0" max="8" step="0.02" onchange="syncFitLabels(); scheduleCalc()" oninput="syncFitLabels()">
+      </div>
+      <div class="form-group">
+        <label>拟合范围上限 (eV) <span style="font-weight:400;color:#999;" id="fit-max-nm"></span></label>
+        <input type="number" id="fit-max" value="4.0" min="0" max="8" step="0.02" onchange="syncFitLabels(); scheduleCalc()" oninput="syncFitLabels()">
+      </div>
+      <button class="btn btn-primary" onclick="calculate()" style="margin-bottom:12px;">🔍 计算带隙</button>
+    </div>
+    <p style="font-size:0.78rem;color:#888;margin-top:4px;">拟合范围需落在 Tauc 曲线的<strong>线性段</strong>内。可点击图表直接选范围，或选材料预设。</p>
+    <div class="note">
+      <strong>公式说明：</strong> 光子能量 hν = 1240 / λ(nm)。<br>
+      透光率模式（无膜厚）：α ∝ ln(100/T%)；透光率模式（有膜厚）：α = −ln(T/(1−R)²) / d。<br>
+      吸光度模式：α ∝ A；吸收系数模式：直接用 α。纵轴标注 a.u. 时为相对值，标注 (eV/cm)^(1/n) 时为绝对值。<br>
+      Tauc 关系：(αhν)<sup>1/n</sup> ∝ (hν − Eg)，线性区外推至零即得 Eg。<br>
+      切线取法：拟合范围内滑动窗口取 R² 最高的局部区间做线性回归，找最线性的段而非最陡的段。
+    </div>
+  </div>
+
+  <!-- 结果卡 -->
+  <div class="card" id="result-card" style="display:none;">
+    <h2>📊 计算结果</h2>
+    <div class="result-box" id="results"></div>
+    <div class="chart-container">
+      <canvas id="taucChart"></canvas>
+    </div>
+    <div style="margin-top:10px;font-size:0.8rem;">
+      <span style="cursor:pointer;color:#0f3460;font-weight:600;" onclick="document.getElementById('chart-style-panel').style.display = document.getElementById('chart-style-panel').style.display === 'none' ? 'block' : 'none'">⚙️ 图表样式 ▼</span>
+      <div id="chart-style-panel" style="display:none;margin-top:8px;padding:10px 14px;background:#f8f9fc;border-radius:8px;">
+        <div class="form-row">
+          <div class="form-group" style="min-width:80px;"><label>X轴下限</label><input type="number" id="x-min" step="0.1" onchange="applyChartStyle()"></div>
+          <div class="form-group" style="min-width:80px;"><label>X轴上限</label><input type="number" id="x-max" step="0.1" onchange="applyChartStyle()"></div>
+          <div class="form-group" style="min-width:80px;"><label>Y轴上限</label><input type="number" id="y-max" step="any" onchange="applyChartStyle()" placeholder="自动"></div>
+          <div class="form-group" style="min-width:100px;"><label>数据线颜色</label><input type="color" id="line-color" value="#3366cc" onchange="applyChartStyle()"></div>
+          <div class="form-group" style="min-width:100px;"><label>切线颜色</label><input type="color" id="tangent-color" value="#dc3545" onchange="applyChartStyle()"></div>
+          <div class="form-group" style="min-width:60px;"><label>线宽</label><input type="number" id="line-width" value="2" min="0.5" max="6" step="0.5" onchange="applyChartStyle()"></div>
+          <div class="form-group" style="min-width:60px;"><label>点大小</label><input type="number" id="point-size" value="3.5" min="0" max="10" step="0.5" onchange="applyChartStyle()"></div>
+          <button class="btn btn-outline btn-sm" onclick="resetChartStyle()" style="margin-top:18px;">🔄 重置</button>
+          <button class="btn btn-outline btn-sm" onclick="applyChartStyle(true)" style="margin-top:18px;">✅ 应用</button>
+        </div>
+      </div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-outline btn-sm" onclick="exportImage('taucChart')">📷 导出 Tauc 图</button>
+      <button class="btn btn-outline btn-sm" onclick="exportCSV()">📋 导出数据 CSV</button>
+    </div>
+  </div>
+
+</div>
+
+<footer>基于 Tauc 公式 · 支持直接/间接/禁戒带隙 · 滑动窗口最优R²拟合</footer>
+
+<div class="modal-overlay" id="helpModal">
+  <div class="modal-box">
+    <h2>📖 使用方法 <button class="modal-close" id="btnModalClose">✕</button></h2>
+    <div class="modal-body">
+      <h3>1. 数据输入</h3>
+      <ul>
+        <li><strong>手动输入：</strong>在文本框中每行输入 <code>波长(nm) 数值</code>（空格或 Tab 分隔）</li>
+        <li><strong>文件上传：</strong>支持 .txt / .csv / .xlsx 格式，每行两列数据</li>
+        <li><strong>示例数据：</strong>内置 ZnO 薄膜典型透光光谱（直接带隙约 3.25 eV）</li>
+      </ul>
+
+      <h3>2. 参数设置</h3>
+      <ul>
+        <li><strong>数据类型：</strong>选择「透光率 T%」「吸光度 A」或「吸收系数 α (cm⁻¹)」，程序自动转换</li>
+        <li><strong>带隙类型：</strong>直接带隙 (n=1/2)、间接带隙 (n=2)、直接禁戒 (n=3/2)</li>
+        <li><strong>材料预设：</strong>可选择 ZnO、TiO₂ 等常见材料快速填充参数</li>
+        <li><strong>薄膜厚度：</strong>用于吸收系数与吸光度之间的换算</li>
+        <li><strong>拟合范围：</strong>设置 Tauc plot 线性拟合的能量区间</li>
+      </ul>
+
+      <h3>3. 查看结果</h3>
+      <ul>
+        <li>点击「计算带隙」或修改参数后自动触发计算</li>
+        <li><strong>Tauc 曲线图：</strong>(αhν)^(1/n) vs hν，带线性拟合线和 x 轴截距标注</li>
+        <li><strong>带隙能量：</strong>显示拟合得到的带隙值 (eV) 和拟合优度 R²</li>
+        <li>支持导出拟合数据为 CSV 文件</li>
+      </ul>
+
+      <h3>Tauc Plot 原理</h3>
+      <ul>
+        <li>公式：(αhν)^(1/n) = A (hν − E_g)</li>
+        <li>透光率 → 吸光度：A = −log₁₀(T/100)</li>
+        <li>吸收系数：α = 2.303 × A / d（d 为膜厚）</li>
+        <li>在 Tauc plot 的线性区域做切线，外推至 x 轴截距即为带隙 E_g</li>
+      </ul>
+
+      <div class="tip">💡 <strong>提示：</strong>默认显示 ZnO 示例数据（直接带隙）。如需测量自己的样品，请确保数据类型与输入数据匹配（透光率 T%、吸光度 A 或吸收系数 α）。拟合范围的选择对结果影响较大，建议根据 Tauc 曲线的线性区域手动调整。</div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentData = [];
+let chartInstance = null;
+let calcTimer = null;
+let lastCalc = null;
+
+// --- 防抖自动计算 ---
+function scheduleCalc() {
+  if (calcTimer) clearTimeout(calcTimer);
+  calcTimer = setTimeout(() => calculate(), 300);
+}
+
+// --- 示例数据（透光率光谱）---
+const DEMO_DATA = [
+  [300, 1.2], [310, 1.8], [320, 2.6], [330, 3.8], [340, 5.5], [350, 7.9],
+  [355, 9.5], [360, 11.5], [365, 14.0], [370, 17.2], [375, 21.0], [380, 26.0],
+  [385, 32.0], [390, 38.5], [395, 45.0], [400, 51.0], [405, 56.0], [410, 60.0],
+  [415, 63.5], [420, 66.5], [425, 69.0], [430, 71.0], [435, 72.8], [440, 74.2],
+  [450, 76.5], [460, 78.2], [470, 79.5], [480, 80.5], [490, 81.3], [500, 82.0],
+  [520, 83.0], [540, 83.8], [560, 84.3], [580, 84.7], [600, 85.0],
+  [650, 85.5], [700, 85.8], [750, 86.0], [800, 86.2]
+];
+const DEMO_DATA_TYPE = 'transmittance';
+
+// --- 数据类型辅助函数 ---
+function getDataType() {
+  return document.getElementById('data-type').value;
+}
+
+function getFilmThickness() {
+  const v = parseFloat(document.getElementById('film-thickness').value);
+  return (v > 0) ? v : null;
+}
+
+function getReflectance() {
+  const v = parseFloat(document.getElementById('reflectance').value);
+  return (v >= 0 && v <= 0.5) ? v : 0;
+}
+
+function getValueColumnLabel() {
+  const t = getDataType();
+  if (t === 'transmittance') return '透光率 (%)';
+  if (t === 'absorbance')   return '吸光度 A';
+  return '吸收系数 α (cm⁻¹)';
+}
+
+function updateDataHints() {
+  const t = getDataType();
+  const hint = document.getElementById('manual-hint');
+  if (t === 'transmittance') hint.textContent = '每行输入：波长(nm) 透光率(%)，空格或 Tab 分隔';
+  else if (t === 'absorbance') hint.textContent = '每行输入：波长(nm) 吸光度，空格或 Tab 分隔';
+  else hint.textContent = '每行输入：波长(nm) 吸收系数(cm⁻¹)，空格或 Tab 分隔';
+  const activeTab = document.querySelector('.tab-content.active');
+  if (activeTab && activeTab.id === 'tab-file' && currentData.length) renderFilePreview(currentData);
+  if (activeTab && activeTab.id === 'tab-demo') renderDemoPreview();
+  updateDemoWarning();
+}
+
+function onDataTypeChange() { updateDataHints(); calculate(); }
+
+function onThicknessChange() {
+  updateThicknessHint();
+  scheduleCalc();
+}
+
+function updateThicknessHint() {
+  const d = getFilmThickness();
+  const hint = document.getElementById('thickness-hint');
+  if (d) {
+    const R = getReflectance();
+    if (R > 0) {
+      hint.textContent = 'α = −ln(T/(1−' + R.toFixed(3) + ')²) / ' + d + ' nm，纵轴为绝对单位';
+    } else {
+      hint.textContent = 'α = −ln(T) / ' + d + ' nm，纵轴为绝对单位 (忽略反射)';
+    }
+  } else {
+    hint.textContent = '输入膜厚后 α = −ln(T/(1−R)²)/d，纵轴获得绝对单位';
+  }
+}
+
+// --- 演示数据警告 ---
+function updateDemoWarning() {
+  const activeTab = document.querySelector('.tab-content.active');
+  const warning = document.getElementById('demo-warning');
+  const warnType = document.getElementById('demo-warn-type');
+  if (!activeTab || activeTab.id !== 'tab-demo') {
+    warning.style.display = 'none';
+    return;
+  }
+  const currentType = getDataType();
+  if (currentType !== DEMO_DATA_TYPE) {
+    const typeNames = {'transmittance': '透光率 T%', 'absorbance': '吸光度 A', 'absorption': '吸收系数 α (cm⁻¹)'};
+    warnType.textContent = typeNames[currentType] || currentType;
+    warning.style.display = 'block';
+  } else {
+    warning.style.display = 'none';
+  }
+}
+
+// --- 计算 α ---
+function computeAlpha(rawVal, dataType, thickness, reflectance) {
+  if (dataType === 'transmittance') {
+    if (rawVal <= 0 || rawVal >= 100) return null;
+    if (thickness) {
+      const T = rawVal / 100;
+      const denom = (1 - reflectance) * (1 - reflectance);
+      if (denom <= 0) return null;
+      const arg = T / denom;
+      if (arg <= 0) return null;
+      return -Math.log(arg) / thickness;
+    } else {
+      return Math.log(100 / rawVal);
+    }
+  } else if (dataType === 'absorbance') {
+    if (rawVal < 0) return null;
+    return rawVal;
+  } else {
+    if (rawVal <= 0) return null;
+    return rawVal;
+  }
+}
+
+// --- 材料预设 ---
+function applyPreset() {
+  const val = document.getElementById('material-preset').value;
+  const presets = {
+    'zno':     { type:'direct',    min:'3.20', max:'3.50' },
+    'tio2-a':  { type:'indirect',  min:'3.20', max:'3.60' },
+    'tio2-r':  { type:'direct',    min:'2.90', max:'3.30' },
+    'sno2':    { type:'direct',    min:'3.50', max:'3.90' },
+    'wo3':     { type:'indirect',  min:'2.40', max:'3.00' },
+    'fe2o3':   { type:'direct',    min:'2.10', max:'2.50' },
+    'cds':     { type:'direct',    min:'2.30', max:'2.70' },
+    'gan':     { type:'direct',    min:'3.30', max:'3.70' },
+    'si':      { type:'indirect',  min:'1.10', max:'1.40' },
+    'cu2o':    { type:'direct',    min:'2.10', max:'2.50' },
+    'bivo4':   { type:'direct',    min:'2.40', max:'2.80' },
+    'aln':     { type:'direct',    min:'6.00', max:'6.30' },
+    'al2o3':   { type:'direct',    min:'6.50', max:'7.50' },
+  };
+  if (!val || !presets[val]) return;
+  const p = presets[val];
+  document.getElementById('gap-type').value = p.type;
+  document.getElementById('fit-min').value = p.min;
+  document.getElementById('fit-max').value = p.max;
+  syncFitLabels();
+  calculate();
+}
+
+// --- 波段预设 ---
+function applyBandPreset() {
+  const val = document.getElementById('band-preset').value;
+  const bands = {
+    'uvc':     [200, 280],
+    'uvb':     [280, 315],
+    'uva':     [315, 400],
+    'vis':     [400, 700],
+    'nir':     [700, 1100],
+    'uv-vis':  [200, 700],
+    'vis-nir': [400, 1100],
+  };
+  if (!val || !bands[val]) return;
+  document.getElementById('wl-min').value = bands[val][0];
+  document.getElementById('wl-max').value = bands[val][1];
+  calculate();
+}
+
+function clearWlRange() {
+  document.getElementById('wl-min').value = '';
+  document.getElementById('wl-max').value = '';
+  document.getElementById('band-preset').value = '';
+  calculate();
+}
+
+function onWlRangeChange() {
+  document.getElementById('band-preset').value = '';
+  scheduleCalc();
+}
+
+function syncFitLabels() {
+  const fitMin = parseFloat(document.getElementById('fit-min').value);
+  const fitMax = parseFloat(document.getElementById('fit-max').value);
+  document.getElementById('fit-min-nm').textContent = fitMin ? `≈ ${(1240/fitMin).toFixed(0)} nm` : '';
+  document.getElementById('fit-max-nm').textContent = fitMax ? `≈ ${(1240/fitMax).toFixed(0)} nm` : '';
+}
+
+// --- Tab 切换 ---
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', ['manual','file','demo'][i] === tab);
+  });
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  const el = document.getElementById('tab-' + tab);
+  if (el) el.classList.add('active');
+  if (tab === 'demo') renderDemoPreview();
+  updateDemoWarning();
+}
+
+// --- 文件读取 ---
+function handleFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  function parseText(text) {
+    const rows = text.split(/[\r\n]+/).filter(r => r.trim() && !r.trim().startsWith('#'));
+    const parsed = [];
+    for (const row of rows) {
+      const parts = row.split(/[,\s\t]+/);
+      if (parts.length >= 2) {
+        const wl = parseFloat(parts[0]);
+        const val = parseFloat(parts[1]);
+        if (!isNaN(wl) && !isNaN(val)) parsed.push([wl, val]);
+      }
+    }
+    return parsed;
+  }
+
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'xlsx') {
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        const wb = XLSX.read(ev.target.result, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        const parsed = [];
+        for (const row of rows) {
+          if (!row || row.length < 2) continue;
+          const wl = parseFloat(row[0]);
+          const val = parseFloat(row[1]);
+          if (!isNaN(wl) && !isNaN(val)) parsed.push([wl, val]);
+        }
+        currentData = parsed;
+        renderFilePreview(parsed);
+        document.getElementById('manual-data').value = parsed.map(p => p.join('\t')).join('\n');
+      } catch (err) {
+        alert('无法解析 .xlsx 文件: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      const parsed = parseText(ev.target.result);
+      currentData = parsed;
+      renderFilePreview(parsed);
+      document.getElementById('manual-data').value = parsed.map(p => p.join('\t')).join('\n');
+    };
+    reader.readAsText(file);
+  }
+}
+
+function renderFilePreview(data) {
+  const div = document.getElementById('file-preview');
+  if (!data.length) { div.innerHTML = '<p style="color:#999;">未解析到有效数据</p>'; return; }
+  const colLabel = getValueColumnLabel();
+  let html = `<table><tr><th>#</th><th>波长 (nm)</th><th>${colLabel}</th></tr>`;
+  data.slice(0,15).forEach((d,i) => { html += `<tr><td>${i+1}</td><td>${d[0]}</td><td>${d[1]}</td></tr>`; });
+  if (data.length > 15) html += `<tr><td colspan="3" style="text-align:center;color:#999;">... 共 ${data.length} 行</td></tr>`;
+  html += '</table>';
+  div.innerHTML = html;
+}
+
+function renderDemoPreview() {
+  const div = document.getElementById('demo-preview');
+  const colLabel = getValueColumnLabel();
+  let html = `<table><tr><th>#</th><th>波长 (nm)</th><th>${colLabel}</th></tr>`;
+  DEMO_DATA.slice(0,20).forEach((d,i) => { html += `<tr><td>${i+1}</td><td>${d[0]}</td><td>${d[1]}</td></tr>`; });
+  html += `<tr><td colspan="3" style="text-align:center;color:#999;">... 共 ${DEMO_DATA.length} 行</td></tr></table>`;
+  div.innerHTML = html;
+}
+
+// --- 获取当前数据（应用波长过滤）---
+function getData() {
+  const activeTab = document.querySelector('.tab-content.active');
+  if (!activeTab) return [];
+  const tabId = activeTab.id;
+  let raw = [];
+  if (tabId === 'tab-demo') raw = DEMO_DATA;
+  else if (tabId === 'tab-file' && currentData.length) raw = currentData;
+  else {
+    const text = document.getElementById('manual-data').value.trim();
+    const rows = text.split(/[\r\n]+/).filter(r => r.trim());
+    for (const row of rows) {
+      const parts = row.split(/[,\s\t]+/);
+      if (parts.length >= 2) {
+        const wl = parseFloat(parts[0]);
+        const tr = parseFloat(parts[1]);
+        if (!isNaN(wl) && !isNaN(tr)) raw.push([wl, tr]);
+      }
+    }
+  }
+  const wlMin = parseFloat(document.getElementById('wl-min').value) || 0;
+  const wlMax = parseFloat(document.getElementById('wl-max').value) || Infinity;
+  if (wlMin > 0 || wlMax < Infinity) {
+    return raw.filter(d => d[0] >= wlMin && d[0] <= wlMax);
+  }
+  return raw;
+}
+
+// --- 核心计算 ---
+function calculate() {
+  const data = getData();
+  if (data.length < 5) { alert('请提供至少 5 个数据点'); return; }
+
+  const dataType = getDataType();
+  const gapType = document.getElementById('gap-type').value;
+  const fitMin = parseFloat(document.getElementById('fit-min').value) || 0;
+  const fitMax = parseFloat(document.getElementById('fit-max').value) || 10;
+  const thickness = getFilmThickness();
+  const reflectance = getReflectance();
+
+  const processed = [];
+  for (const [wl, rawVal] of data) {
+    const hv = 1240 / wl;
+    const alphaRel = computeAlpha(rawVal, dataType, thickness, reflectance);
+    if (alphaRel === null) continue;
+    let exponent;
+    if (gapType === 'direct') exponent = 2;
+    else if (gapType === 'indirect') exponent = 0.5;
+    else exponent = 2/3;
+    const y = Math.pow(alphaRel * hv, exponent);
+    processed.push({ wl, rawVal, hv, alphaRel, y });
+  }
+
+  if (processed.length < 5) { alert('有效数据点不足（请检查数据是否符合当前数据类型）'); return; }
+
+  const fitPoints = processed.filter(p => p.hv >= fitMin && p.hv <= fitMax);
+  if (fitPoints.length < 3) {
+    const hvVals = processed.map(p => p.hv);
+    const hvMin = Math.min(...hvVals).toFixed(3);
+    const hvMax = Math.max(...hvVals).toFixed(3);
+    const wlMin = (1240/hvMax).toFixed(0);
+    const wlMax = (1240/hvMin).toFixed(0);
+    const autoMin = (parseFloat(hvMin) + (parseFloat(hvMax)-parseFloat(hvMin))*0.3).toFixed(2);
+    const autoMax = (parseFloat(hvMin) + (parseFloat(hvMax)-parseFloat(hvMin))*0.7).toFixed(2);
+    const pointsInAuto = processed.filter(p => p.hv >= parseFloat(autoMin) && p.hv <= parseFloat(autoMax)).length;
+    const msg = `拟合范围 ${fitMin}–${fitMax} eV 内仅有 ${fitPoints.length} 个数据点（至少需要 3 个）。\n\n`
+      + `你的数据能量范围：${hvMin}–${hvMax} eV\n`
+      + `对应波长范围：${wlMin}–${wlMax} nm\n\n`
+      + `建议拟合范围：${autoMin}–${autoMax} eV（该区间有 ${pointsInAuto} 个点）\n\n`
+      + `是否自动应用建议范围？`;
+    if (confirm(msg)) {
+      document.getElementById('fit-min').value = autoMin;
+      document.getElementById('fit-max').value = autoMax;
+      calculate();
+    }
+    return;
+  }
+
+  // 滑动窗口最优 R²：枚举所有连续子区间，取 R² 最高的做切线
+  const n = fitPoints.length;
+  const minLen = Math.max(3, Math.floor(n * 0.25));
+  let slope = 0, intercept = 0, r2 = -Infinity;
+  for (let i = 0; i < n - minLen; i++) {
+    let sx = 0, sy = 0, sxx = 0, sxy = 0, syy = 0, cnt = 0;
+    for (let j = i; j < n; j++) {
+      const x = fitPoints[j].hv, y = fitPoints[j].y;
+      sx += x; sy += y; sxx += x*x; sxy += x*y; syy += y*y; cnt++;
+      if (cnt < minLen) continue;
+      const denomX = cnt*sxx - sx*sx;
+      const denomY = cnt*syy - sy*sy;
+      if (denomX <= 0 || denomY <= 0) continue;
+      const r2num = cnt*sxy - sx*sy;
+      const thisR2 = Math.pow(r2num / Math.sqrt(denomX * denomY), 2);
+      if (thisR2 > r2) {
+        r2 = thisR2;
+        slope = (cnt*sxy - sx*sy) / denomX;
+        intercept = (sy - slope*sx) / cnt;
+      }
+    }
+  }
+  if (r2 === -Infinity) {
+    ({ slope, intercept, r2 } = linearRegression(fitPoints.map(p => p.hv), fitPoints.map(p => p.y)));
+  }
+  const Eg = r2 > 0 && slope !== 0 ? -intercept / slope : NaN;
+
+  const resultCard = document.getElementById('result-card');
+  resultCard.style.display = 'block';
+  const r2Quality = r2 >= 0.99 ? '✅ 优' : r2 >= 0.95 ? '⚠️ 良' : '❌ 差';
+  document.getElementById('results').innerHTML = `
+    <div class="result-item"><div class="value">${isNaN(Eg) ? '—' : Eg.toFixed(3)}</div><div class="label">带隙 Eg (eV)</div></div>
+    <div class="result-item"><div class="value">${isNaN(Eg) ? '—' : (1240/Eg).toFixed(1)}</div><div class="label">对应波长 (nm)</div></div>
+    <div class="result-item"><div class="value">${r2.toFixed(5)}</div><div class="label">R² 拟合优度 <span style="font-size:0.7rem;">${r2Quality}</span></div></div>
+    <div class="result-item"><div class="value">${processed.length}</div><div class="label">有效数据点</div></div>
+  `;
+
+  renderChart(processed, fitPoints, Eg, slope, intercept, gapType, thickness);
+  lastCalc = { processed, fitPoints, Eg, slope, intercept, gapType, thickness };
+}
+
+// --- 线性回归 ---
+function linearRegression(x, y) {
+  const n = x.length;
+  let sx = 0, sy = 0, sxx = 0, sxy = 0, syy = 0;
+  for (let i = 0; i < n; i++) {
+    sx += x[i]; sy += y[i]; sxx += x[i]*x[i]; sxy += x[i]*y[i]; syy += y[i]*y[i];
+  }
+  const denomX = n*sxx - sx*sx;
+  const denomY = n*syy - sy*sy;
+  if (denomX <= 0 || denomY <= 0) return { slope: 0, intercept: 0, r2: 0 };
+  const slope = (n*sxy - sx*sy) / denomX;
+  const intercept = (sy - slope*sx) / n;
+  const r2 = Math.pow((n*sxy - sx*sy) / Math.sqrt(denomX * denomY), 2);
+  return { slope, intercept, r2 };
+}
+
+// --- 渲染图表 ---
+function renderChart(allPoints, fitPoints, Eg, slope, intercept, gapType, thickness) {
+  if (chartInstance) chartInstance.destroy();
+
+  allPoints.sort((a,b) => a.hv - b.hv);
+  fitPoints.sort((a,b) => a.hv - b.hv);
+
+  const allHv  = allPoints.map(p => p.hv);
+  const allY   = allPoints.map(p => p.y);
+  const fitHv  = fitPoints.map(p => p.hv);
+  const fitY   = fitPoints.map(p => p.y);
+
+  const xMin = Math.min(...allHv);
+  const xMax = Math.max(...allHv);
+
+  const hasValidEg = !isNaN(Eg) && isFinite(Eg) && Eg > 0;
+  const tangentExtrapX = hasValidEg ? [Eg, fitHv[0]] : [];
+  const tangentExtrapY = hasValidEg ? [0, slope * fitHv[0] + intercept] : [];
+  const tangentSolidX = [fitHv[0], xMax];
+  const tangentSolidY = [slope * fitHv[0] + intercept, slope * xMax + intercept];
+
+  const cBlue   = document.getElementById('line-color').value || '#3366cc';
+  const cRed    = document.getElementById('tangent-color').value || '#dc3545';
+  const cRedBg  = hexToRgba(cRed, 0.10);
+  const cGreen  = '#198754';
+  const lineW   = parseFloat(document.getElementById('line-width').value) || 2;
+  const ptSize  = parseFloat(document.getElementById('point-size').value) || 3.5;
+  const userXMin = parseFloat(document.getElementById('x-min').value) || null;
+  const userXMax = parseFloat(document.getElementById('x-max').value) || null;
+  const userYMax = parseFloat(document.getElementById('y-max').value) || null;
+
+  const hasThickness = thickness != null;
+  const yUnitSuffix = hasThickness ? ' (eV/cm)^' : ' (a.u.)';
+  let yBase = '(αhν)';
+  let yLabel;
+  if (gapType === 'direct')      yLabel = yBase + '²' + yUnitSuffix;
+  else if (gapType === 'indirect') yLabel = yBase + '^½' + yUnitSuffix;
+  else                             yLabel = yBase + '^⅔' + yUnitSuffix;
+
+  const datasets = [
+    {
+      label: '(αhν)¹/ⁿ',
+      data: allPoints.map(p => ({ x: p.hv, y: p.y })),
+      backgroundColor: cBlue, borderColor: cBlue,
+      pointRadius: ptSize, pointHoverRadius: ptSize + 3.5,
+      pointBackgroundColor: cBlue, pointBorderColor: '#fff', pointBorderWidth: 1.5,
+      showLine: true, borderWidth: lineW, tension: 0.35, fill: false, order: 3,
+    },
+    {
+      label: '拟合点',
+      data: fitPoints.map(p => ({ x: p.hv, y: p.y })),
+      backgroundColor: cRed, borderColor: cRed,
+      pointRadius: ptSize + 1.5, pointHoverRadius: 8,
+      pointBackgroundColor: cRed, pointBorderColor: '#fff', pointBorderWidth: 2,
+      showLine: false, order: 2,
+    },
+  ];
+
+  if (hasValidEg && tangentExtrapX.length === 2) {
+    datasets.push({
+      label: '切线（外推）',
+      data: tangentExtrapX.map((x,i) => ({ x, y: tangentExtrapY[i] })),
+      borderColor: cRed, borderWidth: lineW + 0.5, borderDash: [8, 5],
+      pointRadius: 0, pointHoverRadius: 0, showLine: true, fill: false, tension: 0, order: 0,
+    });
+  }
+
+  datasets.push({
+    label: '切线',
+    data: tangentSolidX.map((x,i) => ({ x, y: tangentSolidY[i] })),
+    borderColor: cRed, borderWidth: lineW + 0.5, borderDash: [],
+    pointRadius: 0, pointHoverRadius: 0, showLine: true, fill: false, tension: 0, order: 1,
+  });
+
+  const gapLabel = gapType === 'direct' ? '直接' : gapType === 'indirect' ? '间接' : '直接禁戒';
+
+  const fitBgPlugin = {
+    id: 'fitBgPlugin',
+    beforeDatasetsDraw(chart) {
+      const { ctx, scales: { x, y }, chartArea } = chart;
+      if (!x || !y) return;
+      ctx.save();
+      const fitLeft  = x.getPixelForValue(fitHv[0]);
+      const fitRight = x.getPixelForValue(fitHv[fitHv.length-1]);
+      ctx.fillStyle = cRedBg;
+      ctx.fillRect(fitLeft, chartArea.top, fitRight - fitLeft, chartArea.bottom - chartArea.top);
+      ctx.restore();
+    }
+  };
+
+  const egAnnotPlugin = {
+    id: 'egAnnotPlugin',
+    afterDraw(chart) {
+      const { ctx, scales: { x, y }, chartArea } = chart;
+      if (!x || !y) return;
+      ctx.save();
+
+      const bounds = [
+        { hv: fitHv[0], color: 'rgba(220,53,69,0.45)', label: '下限' },
+        { hv: fitHv[fitHv.length-1], color: 'rgba(220,53,69,0.45)', label: '上限' },
+      ];
+      bounds.forEach(b => {
+        const px = x.getPixelForValue(b.hv);
+        if (px >= chartArea.left && px <= chartArea.right) {
+          ctx.beginPath();
+          ctx.setLineDash([3, 4]);
+          ctx.strokeStyle = b.color;
+          ctx.lineWidth = 1;
+          ctx.moveTo(px, chartArea.top);
+          ctx.lineTo(px, chartArea.bottom);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.fillStyle = b.color;
+          ctx.textAlign = 'center';
+          ctx.fillText(b.label + ' ' + b.hv.toFixed(2), px, chartArea.bottom + 14);
+        }
+      });
+
+      if (hasValidEg) {
+        const egPixel = x.getPixelForValue(Eg);
+        if (egPixel >= chartArea.left && egPixel <= chartArea.right) {
+          ctx.beginPath();
+          ctx.setLineDash([4, 5]);
+          ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+          ctx.lineWidth = 1;
+          ctx.moveTo(egPixel, chartArea.top);
+          ctx.lineTo(egPixel, chartArea.bottom);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.font = 'bold 13px -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.fillStyle = cGreen;
+          ctx.textAlign = 'center';
+          ctx.fillText(`Eg = ${Eg.toFixed(3)} eV`, egPixel, chartArea.top - 8);
+        }
+      }
+
+      const y0 = y.getPixelForValue(0);
+      if (y0 >= chartArea.top && y0 <= chartArea.bottom) {
+        ctx.beginPath();
+        ctx.setLineDash([3, 5]);
+        ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+        ctx.lineWidth = 1;
+        ctx.moveTo(chartArea.left, y0);
+        ctx.lineTo(chartArea.right, y0);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      ctx.restore();
+    }
+  };
+
+  const ctx = document.getElementById('taucChart').getContext('2d');
+  chartInstance = new Chart(ctx, {
+    type: 'scatter',
+    data: { datasets },
+    plugins: [fitBgPlugin, egAnnotPlugin],
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 600, easing: 'easeOutQuart' },
+      interaction: { mode: 'nearest', intersect: true },
+      plugins: {
+        title: {
+          display: true,
+          text: `Tauc Plot  —  ${gapLabel}带隙（滑动窗口最优R²）`,
+          font: { size: 17, weight: '700', family: '-apple-system, BlinkMacSystemFont, sans-serif' },
+          color: '#1a1a2e',
+          padding: { bottom: 6 },
+        },
+        subtitle: {
+          display: true,
+          text: hasValidEg
+            ? `Eg = ${Eg.toFixed(3)} eV   |   R² = ${linearRegression(fitHv, fitY).r2.toFixed(5)}`
+            : `R² = ${linearRegression(fitHv, fitY).r2.toFixed(5)}`,
+          font: { size: 13, weight: '500', family: '-apple-system, BlinkMacSystemFont, sans-serif' },
+          color: '#555',
+          padding: { bottom: 16 },
+        },
+        tooltip: {
+          backgroundColor: 'rgba(30,30,50,0.92)',
+          titleFont: { size: 13, weight: '600' },
+          bodyFont: { size: 12 },
+          padding: 12,
+          cornerRadius: 8,
+          callbacks: {
+            label: ctx => {
+              const v = ctx.parsed.y;
+              const yStr = v > 1e4 ? v.toExponential(3) : v.toFixed(4);
+              return `hν: ${ctx.parsed.x.toFixed(3)} eV   |   y: ${yStr}`;
+            }
+          }
+        },
+        legend: {
+          position: 'bottom',
+          labels: {
+            usePointStyle: true, pointStyleWidth: 10, padding: 24,
+            font: { size: 12.5, family: '-apple-system, BlinkMacSystemFont, sans-serif' },
+            generateLabels(chart) {
+              const labels = [
+                { text: 'Tauc 数据曲线',  fillStyle: cBlue, strokeStyle: cBlue, lineWidth: lineW, hidden: false, index: 0, pointStyle: 'circle' },
+                { text: '拟合数据点',      fillStyle: cRed,  strokeStyle: cRed,  lineWidth: lineW + 0.5, hidden: false, index: 1, pointStyle: 'circle' },
+                { text: '切线（实线=拟合区，虚线=外推）', fillStyle: cRed, strokeStyle: cRed, lineWidth: lineW + 0.5, hidden: false, index: 2, pointStyle: 'line' },
+              ];
+              if (hasValidEg) {
+                labels.push({ text: `Eg = ${Eg.toFixed(3)} eV`, fillStyle: cGreen, strokeStyle: cGreen, lineWidth: 1.5, hidden: false, index: -1, pointStyle: 'dash' });
+              }
+              return labels;
+            }
+          },
+        },
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          title: {
+            display: true,
+            text: '光子能量  hν  (eV)',
+            font: { size: 13.5, weight: '600', family: '-apple-system, BlinkMacSystemFont, sans-serif' },
+            color: '#333',
+          },
+          grid: { color: '#e8e8ec', drawTicks: true },
+          ticks: { font: { size: 12 }, color: '#555' },
+          min: userXMin != null ? userXMin : Math.floor(xMin * 10) / 10,
+          max: userXMax != null ? userXMax : Math.ceil(xMax * 10) / 10,
+        },
+        y: {
+          type: 'linear',
+          title: {
+            display: true,
+            text: yLabel,
+            font: { size: 13, weight: '600', family: '-apple-system, BlinkMacSystemFont, sans-serif' },
+            color: '#333',
+          },
+          grid: { color: '#e8e8ec' },
+          ticks: { font: { size: 12 }, color: '#555' },
+          min: 0,
+          max: userYMax || undefined,
+        },
+      },
+    },
+  });
+}
+
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1,3), 16);
+  const g = parseInt(hex.slice(3,5), 16);
+  const b = parseInt(hex.slice(5,7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// --- 图表样式 ---
+function applyChartStyle(closePanel) {
+  if (!lastCalc) return;
+  const { processed, fitPoints, Eg, slope, intercept, gapType, thickness } = lastCalc;
+  renderChart(processed, fitPoints, Eg, slope, intercept, gapType, thickness);
+  if (closePanel) document.getElementById('chart-style-panel').style.display = 'none';
+}
+
+function resetChartStyle() {
+  document.getElementById('x-min').value = '';
+  document.getElementById('x-max').value = '';
+  document.getElementById('y-max').value = '';
+  document.getElementById('line-color').value = '#3366cc';
+  document.getElementById('tangent-color').value = '#dc3545';
+  document.getElementById('line-width').value = '2';
+  document.getElementById('point-size').value = '3.5';
+  applyChartStyle(true);
+}
+
+// --- 导出图像 ---
+function exportImage(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  const link = document.createElement('a');
+  link.download = 'tauc-plot.png';
+  link.href = canvas.toDataURL('image/png', 1.0);
+  link.click();
+}
+
+// --- 导出 CSV ---
+function exportCSV() {
+  const data = getData();
+  if (!data.length) return;
+  const dataType = getDataType();
+  const gapType = document.getElementById('gap-type').value;
+  const thickness = getFilmThickness();
+  const reflectance = getReflectance();
+  const colLabel = getValueColumnLabel();
+  let header = `波长(nm),${colLabel},hν(eV),α`;
+  if (gapType === 'direct') header += ',(αhν)²';
+  else if (gapType === 'indirect') header += ',(αhν)^(1/2)';
+  else header += ',(αhν)^(2/3)';
+  const lines = [header];
+  for (const [wl, rawVal] of data) {
+    const hv = 1240 / wl;
+    const alphaRel = computeAlpha(rawVal, dataType, thickness, reflectance);
+    if (alphaRel === null) continue;
+    let exponent;
+    if (gapType === 'direct') exponent = 2;
+    else if (gapType === 'indirect') exponent = 0.5;
+    else exponent = 2/3;
+    const y = Math.pow(alphaRel * hv, exponent);
+    lines.push(`${wl},${rawVal},${hv.toFixed(4)},${alphaRel.toExponential(6)},${y.toExponential(6)}`);
+  }
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const link = document.createElement('a');
+  link.download = 'tauc-data.csv';
+  link.href = URL.createObjectURL(blob);
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+// --- 初始化 ---
+document.addEventListener('DOMContentLoaded', () => {
+  updateDataHints();
+  syncFitLabels();
+  updateThicknessHint();
+  renderDemoPreview();
+  // 默认显示示例数据 tab
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab')[2].classList.add('active');
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-demo').classList.add('active');
+  calculate();
+
+  // Help modal
+  var hm=document.getElementById('helpModal');
+  document.getElementById('btnHelp').addEventListener('click',function(){hm.classList.add('show');});
+  document.getElementById('btnModalClose').addEventListener('click',function(){hm.classList.remove('show');});
+  hm.addEventListener('click',function(e){if(e.target===hm)hm.classList.remove('show');});
+});
+</script>
+</body>
+</html>

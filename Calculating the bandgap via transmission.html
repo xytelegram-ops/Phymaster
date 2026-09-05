@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>透射率 → 带隙计算工具 · Tauc 报表生成</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    --bg:#EDEFEA;
+    --surface:#FFFFFF;
+    --line:#D9DCD3;
+    --line-soft:#C3C7BD;
+    --ink:#1B1E23;
+    --muted:#68707A;
+    --panel:#20252D;
+    --panel-2:#2A303A;
+    --panel-text:#EDF0F4;
+    --panel-mut:#98A0AB;
+    --ok:#2F6B4F;   --ok-bg:#E3EFE8;
+    --warn:#8A5B12; --warn-bg:#F7EEDC;
+    --err:#A3402F;  --err-bg:#F8E6E1;
+    --focus:#3F7FD9;
+    --disp:"Bahnschrift","DIN Alternate","Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    --body:"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","Consolas","SF Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:var(--body);
+    font-size:15px;
+    line-height:1.65;
+    color:var(--ink);
+    background:var(--bg);
+    -webkit-font-smoothing:antialiased;
+  }
+  /* ---------- header ---------- */
+  .hd{background:var(--panel);color:var(--panel-text);position:relative}
+  .hd-inner{max-width:880px;margin:0 auto;padding:42px 26px 36px}
+  .hd::after{
+    content:"";display:block;height:5px;
+    background:linear-gradient(90deg,#5E4FB8 0%,#3F7FD9 30%,#2FA96C 55%,#D8A62D 78%,#D64C45 100%);
+  }
+  .eyebrow{
+    font-family:var(--disp);font-size:11px;letter-spacing:.22em;
+    color:var(--panel-mut);text-transform:uppercase;margin-bottom:14px;
+  }
+  .hd h1{font-family:var(--disp);font-size:30px;font-weight:600;letter-spacing:.01em}
+  .hd-sub{color:var(--panel-mut);margin-top:8px;font-size:14px}
+  /* ---------- layout ---------- */
+  main{max-width:880px;margin:0 auto;padding:22px 26px 10px}
+  .card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:22px 26px 24px;
+    margin-bottom:18px;
+    box-shadow:0 1px 2px rgba(27,30,35,.05);
+  }
+  .sec-head{display:flex;align-items:flex-start;gap:14px;margin-bottom:16px}
+  .sec-no{
+    font-family:var(--mono);font-size:12px;color:var(--muted);
+    border:1px solid var(--line-soft);border-radius:6px;
+    padding:2px 9px;margin-top:3px;white-space:nowrap;
+  }
+  .sec-head h2{font-family:var(--disp);font-size:17px;font-weight:600}
+  .sec-head p{color:var(--muted);font-size:13.5px;margin-top:2px}
+  /* ---------- drop zone ---------- */
+  .drop{
+    border:1.5px dashed var(--line-soft);border-radius:10px;
+    padding:34px 20px;text-align:center;cursor:pointer;
+    transition:border-color .15s,background .15s;
+    outline:none;
+  }
+  .drop:hover,.drop:focus-visible{border-color:var(--muted)}
+  .drop.drag{border-color:var(--ink);background:#F5F7F2}
+  .drop-glyph{
+    font-family:var(--mono);font-size:22px;color:var(--muted);
+    display:block;margin-bottom:8px;
+  }
+  .drop-main{font-weight:600}
+  .drop-sub{color:var(--muted);font-size:13px;margin-top:4px}
+  /* ---------- params ---------- */
+  .params{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:18px}
+  .field label{display:block;font-size:13.5px;font-weight:600;margin-bottom:6px}
+  .input-row{display:flex;gap:8px}
+  .input-row input,.input-row select{
+    width:100%;font-family:var(--mono);font-size:14.5px;
+    border:1px solid var(--line-soft);border-radius:8px;
+    padding:8px 11px;background:var(--surface);color:var(--ink);
+  }
+  .input-row input:focus,.input-row select:focus{
+    outline:2px solid var(--focus);outline-offset:1px;border-color:var(--focus);
+  }
+  .input-row select{width:auto;min-width:74px}
+  .hint{color:var(--muted);font-size:12.5px;margin-top:6px}
+  /* ---------- file list ---------- */
+  .filelist{list-style:none}
+  .filelist li{
+    border:1px solid var(--line);border-radius:8px;
+    padding:13px 16px;margin-bottom:10px;
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  }
+  .f-main{flex:1;min-width:200px}
+  .f-name{font-family:var(--mono);font-size:14px;word-break:break-all}
+  .f-meta{color:var(--muted);font-size:12.5px;margin-top:3px}
+  .f-preview{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:4px}
+  .f-dgroup{margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .f-dgroup>span{color:var(--muted);font-size:12.5px}
+  .f-dgroup input{
+    width:86px;font-family:var(--mono);font-size:13px;
+    border:1px solid var(--line-soft);border-radius:6px;
+    padding:5px 8px;background:var(--surface);color:var(--ink);
+  }
+  .f-dgroup select{
+    font-family:var(--mono);font-size:12.5px;
+    border:1px solid var(--line-soft);border-radius:6px;
+    padding:5px 4px;background:var(--surface);color:var(--ink);
+  }
+  .f-dgroup input:focus,.f-dgroup select:focus{
+    outline:2px solid var(--focus);outline-offset:1px;border-color:var(--focus);
+  }
+  .chip{
+    font-size:12px;font-weight:600;border-radius:999px;
+    padding:3px 11px;white-space:nowrap;
+  }
+  .chip-loading{background:#ECEEE9;color:var(--muted)}
+  .chip-ok{background:var(--ok-bg);color:var(--ok)}
+  .chip-err{background:var(--err-bg);color:var(--err)}
+  .empty{color:var(--muted);font-size:14px;padding:6px 2px}
+  /* ---------- export ---------- */
+  .export-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .btn-primary{
+    font-family:var(--body);font-size:15px;font-weight:600;
+    background:var(--panel);color:var(--panel-text);
+    border:none;border-radius:8px;padding:11px 26px;cursor:pointer;
+    transition:background .15s;
+  }
+  .btn-primary:hover:not(:disabled){background:var(--panel-2)}
+  .btn-primary:disabled{opacity:.4;cursor:not-allowed}
+  .btn-primary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+  .btn-quiet{
+    font-family:var(--body);font-size:14px;
+    background:var(--surface);color:var(--ink);
+    border:1px solid var(--line-soft);border-radius:8px;
+    padding:10px 18px;cursor:pointer;
+  }
+  .btn-quiet:hover{background:#F5F7F2}
+  .report-list{margin:14px 0 0 18px;color:var(--muted);font-size:13.5px}
+  .report-list li{margin-bottom:3px}
+  .export-msg{margin-top:12px;font-size:13.5px}
+  .export-msg.err{color:var(--err)}
+  .export-msg.ok{color:var(--ok)}
+  /* ---------- footer ---------- */
+  footer{
+    max-width:880px;margin:0 auto;padding:6px 26px 46px;
+    color:var(--muted);font-size:13px;text-align:center;
+  }
+  footer .f1{font-family:var(--mono);font-size:13px;color:var(--ink);margin-bottom:6px}
+  .mono{font-family:var(--mono)}
+  /* ---------- responsive ---------- */
+  @media (max-width:680px){
+    .params{grid-template-columns:1fr;gap:14px}
+    .hd-inner{padding:30px 18px 26px}
+    .hd h1{font-size:24px}
+    main{padding:16px 12px 8px}
+    .card{padding:18px 16px 20px}
+    footer{padding:4px 16px 36px}
+  }
+</style>
+</head>
+<body>
+
+<header class="hd">
+  <div class="hd-inner">
+    <p class="eyebrow">Optical Bandgap · Tauc Report Generator</p>
+    <h1>透射率 → 带隙计算工具</h1>
+    <p class="hd-sub">上传透射光谱 txt，自动识别波长 λ 与透射率 T，按 (αhν)ⁿ 生成两个 Excel 报表</p>
+  </div>
+</header>
+
+<main>
+
+  <section class="card">
+    <div class="sec-head">
+      <span class="sec-no">01</span>
+      <div><h2>光谱文件</h2><p>选择或拖入透射率 txt 文件，一次可多个；波长与透射率列自动识别</p></div>
+    </div>
+    <div id="drop" class="drop" tabindex="0" role="button" aria-label="选择或拖入文件">
+      <span class="drop-glyph" aria-hidden="true">▤</span>
+      <p class="drop-main">拖入文件，或点击选择</p>
+      <p class="drop-sub">支持 .txt / .csv / .dat 文本 · .spc 原始文件请改用同名的 .txt 导出 · 每个文件生成两个 xlsx</p>
+      <input type="file" id="fileInput" multiple accept=".txt,.csv,.dat,.tsv,.spc,text/plain" hidden>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="sec-head">
+      <span class="sec-no">02</span>
+      <div><h2>计算参数</h2><p>n 与波长设置对全部文件生效；薄膜厚度 d 在下方每个文件旁单独设置</p></div>
+    </div>
+    <div class="params">
+      <div class="field">
+        <label for="nSel">指数 n</label>
+        <div class="input-row">
+          <select id="nSel">
+            <option value="0.5">1/2（间接带隙）</option>
+            <option value="1">1</option>
+            <option value="2" selected>2（直接带隙）</option>
+            <option value="custom">自定义…</option>
+          </select>
+          <input id="nCustom" type="number" min="0.0001" step="any" placeholder="如 1.5" hidden>
+        </div>
+        <p class="hint">(αhν)ⁿ 的指数；其他值（如 3/2 直接禁戒跃迁）可选自定义</p>
+      </div>
+      <div class="field">
+        <label for="lamUnit">波长单位</label>
+        <div class="input-row">
+          <select id="lamUnit">
+            <option value="auto" selected>自动识别</option>
+            <option value="nm">nm</option>
+            <option value="um">μm</option>
+          </select>
+        </div>
+        <p class="hint">默认按数值范围判断</p>
+      </div>
+      <div class="field">
+        <label for="lamColSel">波长列（自动识别失败时手动指定）</label>
+        <div class="input-row"><select id="lamColSel"></select></div>
+      </div>
+      <div class="field">
+        <label for="tColSel">透射率列</label>
+        <div class="input-row"><select id="tColSel"></select></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="sec-head">
+      <span class="sec-no">03</span>
+      <div><h2>文件与厚度</h2><p>每个文件一行：识别情况与数据行数；厚度 d 单独设置，单位可选 nm / μm / cm</p></div>
+    </div>
+    <ul id="fileList" class="filelist"></ul>
+    <p id="emptyMsg" class="empty">尚未上传文件 —— 上传后这里会列出每个文件的识别结果</p>
+  </section>
+
+  <section class="card">
+    <div class="sec-head">
+      <span class="sec-no">04</span>
+      <div><h2>导出报表</h2><p>每个文件生成两个独立 xlsx，全部打包为一个 zip</p></div>
+    </div>
+    <div class="export-row">
+      <button id="dlBtn" class="btn-primary" disabled>下载全部报表（zip）</button>
+      <button id="sampleBtn" class="btn-quiet" type="button">下载示例 txt 先试用</button>
+    </div>
+    <ul class="report-list">
+      <li><span class="mono">报表1_Tauc数据</span>：hν、(αhν)ⁿ</li>
+      <li><span class="mono">报表2_完整数据</span>：λ、T、d、α = -ln(T/100)/d、hν、(αhν)ⁿ</li>
+    </ul>
+    <p id="exportMsg" class="export-msg"></p>
+  </section>
+
+</main>
+
+<footer>
+  <p class="f1">α = -ln(T/100)/d &nbsp;·&nbsp; hν = 1240/λ(nm) &nbsp;·&nbsp; (αhν)ⁿ</p>
+  <p>T 以 % 计（文件为 0–1 小数时自动 ×100）；λ 单位 nm/μm 自动识别；自动剔除 T≤0、λ≤0 的行；T&gt;100% 的行保留并计入 α（为负值）</p>
+</footer>
+
+<script>
+/* ==== CORE-START ==== */
+/* 纯计算逻辑：不依赖 DOM，可在 node 中直接测试 */
+/* opts: {lamIdx:-1|0.., tIdx:-1|0.., unit:'auto'|'nm'|'um'} */
+
+function fracInRange(col, lo, hi){
+  var n = 0;
+  for (var i = 0; i < col.length; i++){ var v = col[i]; if (v >= lo && v <= hi) n++; }
+  return col.length ? n / col.length : 0;
+}
+function median(col){
+  var s = col.slice().sort(function(a,b){ return a - b; });
+  return s[Math.floor(s.length / 2)];
+}
+function maxOf(col){ return Math.max.apply(null, col); }
+function monotonicScore(col){
+  var up = 0, dn = 0;
+  for (var i = 1; i < col.length; i++){
+    if (col[i] > col[i-1]) up++; else if (col[i] < col[i-1]) dn++;
+  }
+  var m = col.length - 1;
+  return m ? Math.max(up, dn) / m : 0;
+}
+/* λ 候选列优先级：波长区间的可信度 */
+function lamPriority(col){
+  var m = median(col), mx = maxOf(col);
+  if (m >= 100 && m <= 3500) return 3;       /* nm 常见范围 */
+  if (m >= 0.05 && m < 100 && mx < 25) return 2;  /* μm 常见范围 */
+  if (m >= 0.05 && m < 100) return 1;        /* 可能为 μm 远红外，也可能撞上 T 列 */
+  if (m > 3500 && m <= 60000) return 1;      /* 波数等 */
+  return 0;
+}
+function parseSpectrum(text, opts){
+  opts = opts || {};
+  var out = { ok:false, error:null, lambda:[], trans:[], unit:'nm',
+              tForm:'percent', excluded:0, over100:0, nRows:0, colCount:0 };
+  if (typeof text !== 'string' || !text.trim()){ out.error = '文件内容为空'; return out; }
+
+  var lines = String(text).split(/\r\n|\r|\n/);
+  var numRe = /[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g;
+  var matrix = [];
+
+  for (var i = 0; i < lines.length; i++){
+    var line = lines[i].trim();
+    if (!line) continue;
+    line = line.replace(/−/g,'-').replace(/，/g,',').replace(/；/g,';').replace(/：/g,':');
+    if (/^\s*[-+]?\d+(?:\s*,\s*[-+]?\d+){1,}\s*$/.test(line)){
+      line = line.replace(/,/g,' ');            /* 纯整数 CSV：逗号是分隔符 */
+    } else if (line.indexOf('.') !== -1){
+      line = line.replace(/,/g,' ');            /* 含小数点：逗号是分隔符 */
+    } else if (line.indexOf(',') !== -1){
+      line = line.replace(/,/g,'.');            /* 欧式小数逗号 */
+    }
+    var toks = line.match(numRe);
+    if (!toks || toks.length < 2) continue;
+    var nums = toks.map(parseFloat);
+    if (nums.some(function(v){ return isNaN(v); })) continue;
+    matrix.push(nums);
+  }
+  if (matrix.length < 3){ out.error = '未找到数值数据（至少需要3行），请看文件卡片中的开头预览确认内容'; return out; }
+
+  /* 列数取众数，剔除列数不一致的行 */
+  var counts = {};
+  for (i = 0; i < matrix.length; i++){ counts[matrix[i].length] = (counts[matrix[i].length] || 0) + 1; }
+  var mode = 0, best = -1;
+  for (var k in counts){ if (counts[k] > best){ best = counts[k]; mode = +k; } }
+  if (mode < 2){ out.error = '每行数值列少于2列，无法解析'; return out; }
+  out.colCount = mode;
+  matrix = matrix.filter(function(r){ return r.length === mode; });
+
+  var cols = [];
+  for (var c = 0; c < mode; c++){
+    var col = [];
+    for (i = 0; i < matrix.length; i++) col.push(matrix[i][c]);
+    cols.push(col);
+  }
+
+  /* —— 波长列 —— */
+  var lamIdx = (opts.lamIdx !== undefined && opts.lamIdx >= 0) ? opts.lamIdx : -1;
+  if (lamIdx < 0){
+    var pick = -1, pickP = 0, pickMono = -1;
+    for (c = 0; c < mode; c++){
+      if (c === opts.tIdx && opts.tIdx >= 0) continue;
+      if (fracInRange(cols[c], 0.01, 60000) < 0.85) continue;
+      var p = lamPriority(cols[c]);
+      if (p === 0) continue;
+      var mo = monotonicScore(cols[c]);
+      if (p > pickP || (p === pickP && mo > pickMono)){ pickP = p; pickMono = mo; pick = c; }
+    }
+    lamIdx = pick;
+    if (lamIdx < 0){ out.error = '未找到波长列（预期 0.05–60000 范围），可在上方手动指定列'; return out; }
+  }
+
+  /* —— 透射率列 —— */
+  var tIdx = (opts.tIdx !== undefined && opts.tIdx >= 0) ? opts.tIdx : -1;
+  if (tIdx < 0){
+    var tPick = -1, tScore = 0;
+    for (c = 0; c < mode; c++){
+      if (c === lamIdx) continue;
+      var p100 = fracInRange(cols[c], 0, 200); /* T 可能因基线问题超过 100% */
+      var p1 = fracInRange(cols[c], 0, 1.2);
+      var sc = Math.max(p100, p1);
+      if (sc >= 0.85 && sc > tScore){ tScore = sc; tPick = c; }
+    }
+    tIdx = tPick;
+    if (tIdx < 0){ out.error = '未找到 0–100 的透射率列，可在上方手动指定列'; return out; }
+  }
+
+  /* —— 单位与小数/百分数形式 —— */
+  var unit = opts.unit && opts.unit !== 'auto' ? opts.unit
+            : (median(cols[lamIdx]) >= 100 ? 'nm' : 'um');
+  var tFraction = (maxOf(cols[tIdx]) <= 1.2) && (fracInRange(cols[tIdx], 0, 1.2) >= 0.85);
+
+  /* —— 逐行提取 —— */
+  var lam = [], tr = [];
+  for (i = 0; i < matrix.length; i++){
+    var lv = matrix[i][lamIdx], tv = matrix[i][tIdx];
+    if (tFraction) tv = tv * 100;
+    if (!(lv > 0) || !(tv > 0)){ out.excluded++; continue; }
+    if (tv > 100) out.over100++; /* 保留，按公式计算（α 为负值） */
+    lam.push(lv); tr.push(tv);
+  }
+  if (lam.length < 3){ out.error = '有效数据行不足3行（要求 T 大于 0）'; return out; }
+
+  var idx = lam.map(function(_, j){ return j; });
+  idx.sort(function(a,b){ return lam[a] - lam[b]; });
+  out.lambda = idx.map(function(j){ return lam[j]; });
+  out.trans  = idx.map(function(j){ return tr[j]; });
+  out.unit = unit;
+  out.tForm = tFraction ? 'fraction' : 'percent';
+  out.nRows = out.lambda.length;
+  out.ok = true;
+  return out;
+}
+
+/* 计算：hv(eV)、α、y=(αhν)^n。d 为正数（单位与参数一致），n 为正数 */
+function computeTauc(parsed, d, n, unitOverride){
+  var unit = (unitOverride && unitOverride !== 'auto') ? unitOverride : parsed.unit;
+  var hv = [], alpha = [], y = [];
+  for (var i = 0; i < parsed.lambda.length; i++){
+    var lamNm = (unit === 'um') ? parsed.lambda[i] * 1000 : parsed.lambda[i];
+    var h = 1240 / lamNm;
+    var a = -Math.log(parsed.trans[i] / 100) / d;
+    hv.push(h);
+    alpha.push(a);
+    y.push(Math.pow(a * h, n));
+  }
+  return { hv: hv, alpha: alpha, y: y, lamUnit: unit };
+}
+
+function unitName(u){ return u === 'um' ? 'μm' : u; }
+
+/* NaN → Excel 错误单元格 #NUM!（T>100% 且 n 非整数时 y 无实数值；v=36 是 #NUM! 错误码） */
+function numOrErr(v){
+  return isFinite(v) ? v : { t: 'e', v: 36, w: '#NUM!' };
+}
+
+/* 报表1：hν、(αhν)^n */
+function report1Aoa(res){
+  var aoa = [['hν (eV)', '(αhν)^n']];
+  for (var i = 0; i < res.hv.length; i++) aoa.push([res.hv[i], numOrErr(res.y[i])]);
+  return aoa;
+}
+/* 报表2：λ、T、d、α=-ln(T/100)/d、hν、(αhν)^n */
+function report2Aoa(res, parsed, d, dUnit){
+  var u = res.lamUnit;
+  var aoa = [[
+    u === 'um' ? 'λ (μm)' : 'λ (nm)',
+    'T (%)',
+    'd (' + unitName(dUnit) + ')',
+    'α = -ln(T/100)/d (' + unitName(dUnit) + '⁻¹)',
+    'hν (eV)',
+    '(αhν)^n'
+  ]];
+  for (var i = 0; i < res.hv.length; i++){
+    aoa.push([parsed.lambda[i], parsed.trans[i], d, res.alpha[i], res.hv[i], numOrErr(res.y[i])]);
+  }
+  return aoa;
+}
+/* aoa → xlsx 二进制（依赖全局 XLSX，浏览器与 node 均可） */
+function aoaToWorkbookArray(aoa, sheetName){
+  var ws = XLSX.utils.aoa_to_sheet(aoa);
+  var widths = [];
+  for (var c = 0; c < aoa[0].length; c++){
+    var w = String(aoa[0][c]).length;
+    for (var r = 1; r < Math.min(aoa.length, 30); r++){
+      w = Math.max(w, String(aoa[r][c]).length);
+    }
+    widths.push({ wch: Math.min(w + 2, 44) });
+  }
+  ws['!cols'] = widths;
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  return XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+}
+/* 示例数据：d=200nm、Eg≈3.25eV 的直接带隙薄膜模型 */
+function makeSampleTxt(){
+  var dCm = 2e-5, Eg = 3.25;
+  var lines = ['Wavelength (nm)\tTransmittance (%)'];
+  for (var lam = 300; lam <= 800; lam += 2){
+    var hv = 1240 / lam;
+    var a = hv > Eg ? 8e4 * Math.sqrt(hv - Eg) : 3e3 * Math.exp((hv - Eg) * 2.5);
+    var T = 100 * Math.exp(-a * dCm);
+    T += (Math.random() - 0.5) * 0.4;
+    if (T > 100) T = 99.9;
+    if (T < 0.01) T = 0.01;
+    lines.push(lam.toFixed(1) + '\t' + T.toFixed(3));
+  }
+  return lines.join('\n');
+}
+/* 编码自适应：UTF-16 LE/BE（含BOM与无BOM嗅探），默认 UTF-8。
+   仪器导出的 txt 常为 UTF-16，按 UTF-8 读会把每个数字拆碎导致解析失败 */
+function decodeUTF16(bytes, offset, little){
+  var len = bytes.length - offset;
+  if (len % 2) len -= 1;
+  if (len <= 0) return '';
+  var sub = bytes.subarray(offset, offset + len);
+  if (!little){
+    var swapped = new Uint8Array(len);
+    for (var i = 0; i < len; i += 2){ swapped[i] = sub[i + 1]; swapped[i + 1] = sub[i]; }
+    sub = swapped;
+  }
+  if (typeof TextDecoder !== 'undefined'){
+    try { return new TextDecoder('utf-16le').decode(sub); } catch (e) {}
+  }
+  var s = '';
+  for (var j = 0; j + 1 < sub.length; j += 2) s += String.fromCharCode(sub[j] | (sub[j + 1] << 8));
+  return s;
+}
+function decodeBuffer(buf){
+  var bytes = new Uint8Array(buf);
+  if (bytes.length >= 2){
+    if (bytes[0] === 0xFF && bytes[1] === 0xFE) return decodeUTF16(bytes, 2, true);  /* UTF-16LE BOM */
+    if (bytes[0] === 0xFE && bytes[1] === 0xFF) return decodeUTF16(bytes, 2, false); /* UTF-16BE BOM */
+    var n = Math.min(bytes.length, 2000), nulEven = 0, nulOdd = 0;
+    for (var i = 0; i < n; i++){
+      if (bytes[i] === 0){ if (i % 2 === 0) nulEven++; else nulOdd++; }
+    }
+    /* ASCII 文本的 UTF-16LE：NUL 在奇数位；UTF-16BE：NUL 在偶数位 */
+    if (nulOdd > n * 0.10 && nulOdd > nulEven * 3) return decodeUTF16(bytes, 0, true);
+    if (nulEven > n * 0.10 && nulEven > nulOdd * 3) return decodeUTF16(bytes, 0, false);
+  }
+  if (typeof TextDecoder !== 'undefined'){
+    try { return new TextDecoder('utf-8').decode(bytes); } catch (e) {}
+  }
+  var s = '';
+  for (var j = 0; j < bytes.length; j++) s += String.fromCharCode(bytes[j]);
+  return s;
+}
+/* 二进制内容检测：解码后仍含大量控制字符（如仪器 .spc 原始文件） */
+function isBinaryText(text){
+  if (!text) return false;
+  var n = Math.min(text.length, 4000), ctrl = 0;
+  for (var i = 0; i < n; i++){
+    var c = text.charCodeAt(i);
+    if ((c < 0x09) || (c > 0x0D && c < 0x20) || c === 0x7F) ctrl++;
+  }
+  return ctrl > n * 0.05;
+}
+/* ==== CORE-END ==== */
+</script>
+
+<script>
+(function(){
+  'use strict';
+  var drop = document.getElementById('drop');
+  var input = document.getElementById('fileInput');
+  var fileList = document.getElementById('fileList');
+  var emptyMsg = document.getElementById('emptyMsg');
+  var dlBtn = document.getElementById('dlBtn');
+  var exportMsg = document.getElementById('exportMsg');
+  var sampleBtn = document.getElementById('sampleBtn');
+  var nSel = document.getElementById('nSel');
+  var nCustom = document.getElementById('nCustom');
+  var lamUnitSel = document.getElementById('lamUnit');
+  var lamColSel = document.getElementById('lamColSel');
+  var tColSel = document.getElementById('tColSel');
+
+  var files = []; /* {name, size, text, parsed} */
+
+  /* ---------- 列选择控件 ---------- */
+  var colOptions = ['自动识别'];
+  for (var i = 1; i <= 8; i++) colOptions.push('第' + i + '列');
+  function fillColSelect(sel){
+    var cur = sel.value;
+    sel.innerHTML = '';
+    colOptions.forEach(function(t, j){
+      var o = document.createElement('option');
+      o.value = String(j - 1);
+      o.textContent = t;
+      sel.appendChild(o);
+    });
+    if (cur) sel.value = cur;
+  }
+  fillColSelect(lamColSel); fillColSelect(tColSel);
+
+  function currentOpts(){
+    return {
+      lamIdx: parseInt(lamColSel.value, 10),
+      tIdx: parseInt(tColSel.value, 10),
+      unit: lamUnitSel.value
+    };
+  }
+
+  /* ---------- 解析与渲染 ---------- */
+  function parseAll(){
+    var opts = currentOpts();
+    files.forEach(function(f){
+      f.parsed = parseSpectrum(f.text, opts);
+    });
+    renderList();
+  }
+
+  function previewText(p){
+    var parts = [];
+    var n = Math.min(3, p.lambda.length);
+    for (var i = 0; i < n; i++){
+      parts.push(p.lambda[i] + ' ' + p.unit + ' → T ' + p.trans[i] + ' %');
+    }
+    return parts.join('　·　');
+  }
+
+  function renderList(){
+    fileList.innerHTML = '';
+    var okCount = 0;
+    files.forEach(function(f){
+      var li = document.createElement('li');
+      var main = document.createElement('div');
+      main.className = 'f-main';
+
+      var name = document.createElement('div');
+      name.className = 'f-name';
+      name.textContent = f.name + ' (' + formatSize(f.size) + ')';
+
+      var meta = document.createElement('div');
+      meta.className = 'f-meta';
+
+      var chip = document.createElement('span');
+      chip.className = 'chip';
+
+      if (!f.parsed || !f.parsed.ok){
+        chip.className = 'chip chip-err';
+        chip.textContent = '解析失败';
+        meta.textContent = f.parsed && f.parsed.error ? f.parsed.error : '未知错误';
+        var rawPrev = document.createElement('div');
+        rawPrev.className = 'f-preview';
+        if (isBinaryText(f.text || '')){
+          rawPrev.textContent = '（二进制内容，无文本预览）';
+        } else {
+          var head = String(f.text || '').replace(/\r/g, '').split('\n')
+            .filter(function(l){ return l.trim(); }).slice(0, 2).join('  |  ');
+          if (head.length > 120) head = head.slice(0, 120) + ' …';
+          rawPrev.textContent = '文件开头: ' + (head || '（空文件）');
+        }
+        main.appendChild(name);
+        main.appendChild(meta);
+        main.appendChild(rawPrev);
+        li.appendChild(main);
+        li.appendChild(chip);
+        fileList.appendChild(li);
+        return;
+      } else {
+        okCount++;
+        chip.className = 'chip chip-ok';
+        chip.textContent = '已识别';
+        var p = f.parsed;
+        meta.textContent = p.nRows + ' 行 · λ ' + p.lambda[0] + '–' + p.lambda[p.lambda.length-1]
+          + ' ' + p.unit + ' · T ' + p.trans.reduce(function(a,b){return Math.min(a,b);})
+          + '–' + p.trans.reduce(function(a,b){return Math.max(a,b);}) + ' %'
+          + (p.tForm === 'fraction' ? ' · 文件为0–1小数，已×100' : '')
+          + (p.excluded > 0 ? ' · 已剔除 ' + p.excluded + ' 行异常数据(T≤0)' : '')
+          + (p.over100 > 0 ? ' · 注意 ' + p.over100 + ' 行 T>100%，α 将为负值' : '');
+        var prev = document.createElement('div');
+        prev.className = 'f-preview';
+        prev.textContent = previewText(p);
+        main.appendChild(name);
+        main.appendChild(meta);
+        main.appendChild(prev);
+        /* 该文件的厚度 d */
+        var dg = document.createElement('div');
+        dg.className = 'f-dgroup';
+        var dLabel = document.createElement('span');
+        dLabel.textContent = '厚度 d';
+        var dIn = document.createElement('input');
+        dIn.type = 'number'; dIn.min = '0.0000001'; dIn.step = 'any';
+        dIn.value = String(f.d);
+        dIn.title = '该文件的薄膜厚度';
+        var dSel = document.createElement('select');
+        ['nm','um','cm'].forEach(function(u){
+          var o = document.createElement('option');
+          o.value = u;
+          o.textContent = (u === 'um') ? 'μm' : u;
+          if (u === f.dUnit) o.selected = true;
+          dSel.appendChild(o);
+        });
+        dIn.addEventListener('input', function(){ f.d = parseFloat(dIn.value); });
+        dSel.addEventListener('change', function(){ f.dUnit = dSel.value; });
+        dg.appendChild(dLabel);
+        dg.appendChild(dIn);
+        dg.appendChild(dSel);
+        main.appendChild(dg);
+        li.appendChild(main);
+        li.appendChild(chip);
+        fileList.appendChild(li);
+        return;
+      }
+    });
+    emptyMsg.style.display = files.length ? 'none' : '';
+    dlBtn.disabled = okCount === 0;
+    if (okCount > 0){
+      dlBtn.textContent = '下载全部报表（zip · ' + okCount + ' 个文件）';
+    } else {
+      dlBtn.textContent = '下载全部报表（zip）';
+    }
+  }
+
+  function formatSize(b){
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+    return (b / 1048576).toFixed(2) + ' MB';
+  }
+
+  /* ---------- 读取文件 ---------- */
+  function addFiles(fileLikeList){
+    var arr = Array.prototype.slice.call(fileLikeList);
+    arr.forEach(function(f){
+      var item = { name: f.name, size: f.size, text: '', parsed: null, d: 200, dUnit: 'nm' };
+      files.push(item);
+      var readPromise = f.arrayBuffer ? f.arrayBuffer() : new Promise(function(res, rej){
+        var fr = new FileReader();
+        fr.onload = function(){ res(fr.result); };
+        fr.onerror = function(){ rej(new Error('read error')); };
+        fr.readAsArrayBuffer(f);
+      });
+      readPromise.then(function(buf){
+        item.text = decodeBuffer(buf);
+        if (isBinaryText(item.text)){
+          item.parsed = { ok: false, error: '这是二进制文件（仪器 .spc 原始数据），无法按文本解析。请在 UVProbe 中用"另存为"导出同名的 .txt 文本文件后再上传。' };
+        } else {
+          item.parsed = parseSpectrum(item.text, currentOpts());
+        }
+        renderList();
+      }).catch(function(){
+        item.parsed = { ok: false, error: '文件读取失败，请确认是文本文件' };
+        renderList();
+      });
+    });
+    renderList();
+  }
+
+  drop.addEventListener('click', function(){ input.click(); });
+  drop.addEventListener('keydown', function(e){
+    if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); input.click(); }
+  });
+  input.addEventListener('change', function(){ addFiles(input.files); input.value = ''; });
+  ['dragenter','dragover'].forEach(function(ev){
+    drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.add('drag'); });
+  });
+  ['dragleave','drop'].forEach(function(ev){
+    drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.remove('drag'); });
+  });
+  drop.addEventListener('drop', function(e){
+    if (e.dataTransfer && e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+  });
+
+  /* ---------- 参数变化重新解析 ---------- */
+  lamUnitSel.addEventListener('change', parseAll);
+  lamColSel.addEventListener('change', parseAll);
+  tColSel.addEventListener('change', parseAll);
+  nSel.addEventListener('change', function(){
+    nCustom.hidden = (nSel.value !== 'custom');
+  });
+
+  /* ---------- 导出 ---------- */
+  function sanitizeBase(name){
+    var b = String(name || '').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|\s]+/g, '_');
+    return b || 'data';
+  }
+  function timestamp(){
+    var d = new Date(), p = function(x){ return (x < 10 ? '0' : '') + x; };
+    return '' + d.getFullYear() + p(d.getMonth()+1) + p(d.getDate()) + '_' + p(d.getHours()) + p(d.getMinutes());
+  }
+  dlBtn.addEventListener('click', function(){
+    exportMsg.className = 'export-msg';
+    exportMsg.textContent = '';
+    var nVal = (nSel.value === 'custom') ? parseFloat(nCustom.value) : parseFloat(nSel.value);
+    if (!(nVal > 0)){
+      exportMsg.className = 'export-msg err';
+      exportMsg.textContent = '指数 n 无效（自定义时请填写大于 0 的数值）';
+      return;
+    }
+    var okFiles = files.filter(function(f){ return f.parsed && f.parsed.ok; });
+    if (!okFiles.length){ exportMsg.className = 'export-msg err'; exportMsg.textContent = '没有可导出的文件，请先上传并成功解析'; return; }
+    var bad = okFiles.filter(function(f){ return !(f.d > 0); });
+    if (bad.length){
+      var names = bad.slice(0, 3).map(function(f){ return f.name; }).join('、');
+      if (bad.length > 3) names += ' 等 ' + bad.length + ' 个文件';
+      exportMsg.className = 'export-msg err';
+      exportMsg.textContent = '以下文件的厚度 d 无效，请在文件旁填写：' + names;
+      return;
+    }
+
+    var zip = new JSZip();
+    var used = {};
+    okFiles.forEach(function(f){
+      var base = sanitizeBase(f.name);
+      var b = base, k = 2;
+      while (used[b]){ b = base + '_' + k; k++; }
+      used[b] = true;
+      var res = computeTauc(f.parsed, f.d, nVal, lamUnitSel.value);
+      zip.file(b + '_报表1_Tauc数据.xlsx',
+        aoaToWorkbookArray(report1Aoa(res), '报表1_Tauc数据'));
+      zip.file(b + '_报表2_完整数据.xlsx',
+        aoaToWorkbookArray(report2Aoa(res, f.parsed, f.d, f.dUnit), '报表2_完整数据'));
+    });
+    exportMsg.textContent = '正在打包 ' + (okFiles.length * 2) + ' 个 xlsx …';
+    zip.generateAsync({ type: 'blob' }).then(function(blob){
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = '带隙报表_' + timestamp() + '.zip';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+      exportMsg.className = 'export-msg ok';
+      exportMsg.textContent = '已生成 zip：' + okFiles.length + ' 个文件 × 2 个报表';
+    }).catch(function(err){
+      exportMsg.className = 'export-msg err';
+      exportMsg.textContent = '打包失败：' + (err && err.message ? err.message : err);
+    });
+  });
+
+  /* ---------- 示例数据 ---------- */
+  sampleBtn.addEventListener('click', function(){
+    var txt = makeSampleTxt();
+    var blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '示例透射光谱_200nm.txt';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  });
+})();
+</script>
+</body>
+</html>

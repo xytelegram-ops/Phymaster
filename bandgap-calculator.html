@@ -157,9 +157,9 @@
       <div class="form-group">
         <label>带隙类型</label>
         <select id="gap-type" onchange="calculate()">
-          <option value="direct">直接带隙 (n=1/2)</option>
-          <option value="indirect">间接带隙 (n=2)</option>
-          <option value="direct-forbidden">直接禁戒 (n=3/2)</option>
+          <option value="direct">直接带隙 (n=2)</option>
+          <option value="indirect">间接带隙 (n=1/2)</option>
+          <option value="direct-forbidden">直接禁戒 (n=2/3)</option>
         </select>
       </div>
       <div class="form-group" style="min-width:170px;">
@@ -185,9 +185,16 @@
 
     <!-- 膜厚参数 -->
     <div class="form-row">
-      <div class="form-group" style="min-width:140px;">
-        <label>薄膜厚度 d (nm)</label>
-        <input type="number" id="film-thickness" value="" min="1" max="100000" step="1" placeholder="直接使用比例" onchange="onThicknessChange()" oninput="onThicknessChange()">
+      <div class="form-group" style="min-width:230px;">
+        <label>薄膜厚度 d</label>
+        <div style="display:flex;gap:6px;">
+          <input type="number" id="film-thickness" value="" min="1" max="100000" step="1" placeholder="直接使用比例" onchange="onThicknessChange()" oninput="onThicknessChange()" style="flex:1;min-width:90px;">
+          <select id="thickness-unit" onchange="onThicknessChange()" style="flex:0 0 76px;">
+            <option value="nm" selected>nm</option>
+            <option value="um">μm</option>
+            <option value="cm">cm</option>
+          </select>
+        </div>
       </div>
       <div class="form-group" style="min-width:110px;">
         <label>表面反射率 R</label>
@@ -195,7 +202,7 @@
       </div>
       <div class="form-group" style="min-width:160px;">
         <label style="visibility:hidden;">.</label>
-        <span id="thickness-hint" style="font-size:0.78rem;color:#999;">输入膜厚后 α = −ln(T/(1−R)²)/d，纵轴获得绝对单位</span>
+        <span id="thickness-hint" style="font-size:0.78rem;color:#999;">输入膜厚后 α = −ln((T/100)/(1−R)²)/d（d 单位可选 nm/μm/cm，自动换算为 cm），纵轴获得绝对单位</span>
       </div>
     </div>
 
@@ -243,9 +250,9 @@
     <p style="font-size:0.78rem;color:#888;margin-top:4px;">拟合范围需落在 Tauc 曲线的<strong>线性段</strong>内。可点击图表直接选范围，或选材料预设。</p>
     <div class="note">
       <strong>公式说明：</strong> 光子能量 hν = 1240 / λ(nm)。<br>
-      透光率模式（无膜厚）：α ∝ ln(100/T%)；透光率模式（有膜厚）：α = −ln(T/(1−R)²) / d。<br>
-      吸光度模式：α ∝ A；吸收系数模式：直接用 α。纵轴标注 a.u. 时为相对值，标注 (eV/cm)^(1/n) 时为绝对值。<br>
-      Tauc 关系：(αhν)<sup>1/n</sup> ∝ (hν − Eg)，线性区外推至零即得 Eg。<br>
+      透光率模式（无膜厚）：α ∝ ln(100/T%)；透光率模式（有膜厚）：α = −ln((T/100)/(1−R)²) / d（T 以百分数输入除以 100，d 可选 nm/μm/cm 自动换算为 cm，α 单位 cm⁻¹）。<br>
+      吸光度模式：α ∝ A；吸收系数模式：直接用 α。纵轴标注 a.u. 时为相对值，标注 (eV/cm)^(n) 时为绝对值。<br>
+      Tauc 关系：(αhν)<sup>n</sup> ∝ (hν − Eg)，线性区外推至零即得 Eg。<br>
       切线取法：拟合范围内滑动窗口取 R² 最高的局部区间做线性回归，找最线性的段而非最陡的段。
     </div>
   </div>
@@ -297,25 +304,25 @@
       <h3>2. 参数设置</h3>
       <ul>
         <li><strong>数据类型：</strong>选择「透光率 T%」「吸光度 A」或「吸收系数 α (cm⁻¹)」，程序自动转换</li>
-        <li><strong>带隙类型：</strong>直接带隙 (n=1/2)、间接带隙 (n=2)、直接禁戒 (n=3/2)</li>
+        <li><strong>带隙类型：</strong>直接带隙 (n=2)、间接带隙 (n=1/2)、直接禁戒 (n=2/3)</li>
         <li><strong>材料预设：</strong>可选择 ZnO、TiO₂ 等常见材料快速填充参数</li>
-        <li><strong>薄膜厚度：</strong>用于吸收系数与吸光度之间的换算</li>
+        <li><strong>薄膜厚度：</strong>输入 d 并选择单位（nm / μm / cm），用于计算绝对吸收系数 α (cm⁻¹)</li>
         <li><strong>拟合范围：</strong>设置 Tauc plot 线性拟合的能量区间</li>
       </ul>
 
       <h3>3. 查看结果</h3>
       <ul>
         <li>点击「计算带隙」或修改参数后自动触发计算</li>
-        <li><strong>Tauc 曲线图：</strong>(αhν)^(1/n) vs hν，带线性拟合线和 x 轴截距标注</li>
+        <li><strong>Tauc 曲线图：</strong>(αhν)^(n) vs hν，带线性拟合线和 x 轴截距标注</li>
         <li><strong>带隙能量：</strong>显示拟合得到的带隙值 (eV) 和拟合优度 R²</li>
         <li>支持导出拟合数据为 CSV 文件</li>
       </ul>
 
       <h3>Tauc Plot 原理</h3>
       <ul>
-        <li>公式：(αhν)^(1/n) = A (hν − E_g)</li>
+        <li>公式：(αhν)^(n) = A (hν − E_g)</li>
         <li>透光率 → 吸光度：A = −log₁₀(T/100)</li>
-        <li>吸收系数：α = 2.303 × A / d（d 为膜厚）</li>
+        <li>吸收系数：透光率模式 α = −ln((T/100)/(1−R)²) / d（T 为百分数，d 以 cm 计）；吸光度模式 α ∝ A（相对值）</li>
         <li>在 Tauc plot 的线性区域做切线，外推至 x 轴截距即为带隙 E_g</li>
       </ul>
 
@@ -358,6 +365,10 @@ function getFilmThickness() {
   return (v > 0) ? v : null;
 }
 
+function getThicknessUnit() {
+  return document.getElementById('thickness-unit').value;
+}
+
 function getReflectance() {
   const v = parseFloat(document.getElementById('reflectance').value);
   return (v >= 0 && v <= 0.5) ? v : 0;
@@ -393,14 +404,15 @@ function updateThicknessHint() {
   const d = getFilmThickness();
   const hint = document.getElementById('thickness-hint');
   if (d) {
+    const unit = getThicknessUnit();
     const R = getReflectance();
     if (R > 0) {
-      hint.textContent = 'α = −ln(T/(1−' + R.toFixed(3) + ')²) / ' + d + ' nm，纵轴为绝对单位';
+      hint.textContent = 'α = −ln((T/100)/(1−' + R.toFixed(3) + ')²) / d（d = ' + d + ' ' + unit + ' 自动换算为 cm），α 单位 cm⁻¹';
     } else {
-      hint.textContent = 'α = −ln(T) / ' + d + ' nm，纵轴为绝对单位 (忽略反射)';
+      hint.textContent = 'α = −ln(T/100) / d（d = ' + d + ' ' + unit + ' 自动换算为 cm），α 单位 cm⁻¹（忽略反射）';
     }
   } else {
-    hint.textContent = '输入膜厚后 α = −ln(T/(1−R)²)/d，纵轴获得绝对单位';
+    hint.textContent = '输入膜厚后 α = −ln((T/100)/(1−R)²)/d（d 单位可选 nm/μm/cm，自动换算为 cm），纵轴获得绝对单位';
   }
 }
 
@@ -424,16 +436,18 @@ function updateDemoWarning() {
 }
 
 // --- 计算 α ---
-function computeAlpha(rawVal, dataType, thickness, reflectance) {
+function computeAlpha(rawVal, dataType, thickness, thicknessUnit, reflectance) {
   if (dataType === 'transmittance') {
     if (rawVal <= 0 || rawVal >= 100) return null;
     if (thickness) {
-      const T = rawVal / 100;
+      const T = rawVal / 100; // T 以百分数输入，除以 100 转为 0–1 小数
       const denom = (1 - reflectance) * (1 - reflectance);
       if (denom <= 0) return null;
       const arg = T / denom;
       if (arg <= 0) return null;
-      return -Math.log(arg) / thickness;
+      // d 按所选单位换算为 cm（nm→1e-7、μm→1e-4、cm→1），α 单位为 cm⁻¹
+      const unitToCm = { nm: 1e-7, um: 1e-4, cm: 1 };
+      return -Math.log(arg) / (thickness * unitToCm[thicknessUnit]);
     } else {
       return Math.log(100 / rawVal);
     }
@@ -634,12 +648,13 @@ function calculate() {
   const fitMin = parseFloat(document.getElementById('fit-min').value) || 0;
   const fitMax = parseFloat(document.getElementById('fit-max').value) || 10;
   const thickness = getFilmThickness();
+  const thicknessUnit = getThicknessUnit();
   const reflectance = getReflectance();
 
   const processed = [];
   for (const [wl, rawVal] of data) {
     const hv = 1240 / wl;
-    const alphaRel = computeAlpha(rawVal, dataType, thickness, reflectance);
+    const alphaRel = computeAlpha(rawVal, dataType, thickness, thicknessUnit, reflectance);
     if (alphaRel === null) continue;
     let exponent;
     if (gapType === 'direct') exponent = 2;
@@ -763,16 +778,16 @@ function renderChart(allPoints, fitPoints, Eg, slope, intercept, gapType, thickn
   const userYMax = parseFloat(document.getElementById('y-max').value) || null;
 
   const hasThickness = thickness != null;
-  const yUnitSuffix = hasThickness ? ' (eV/cm)^' : ' (a.u.)';
   let yBase = '(αhν)';
-  let yLabel;
-  if (gapType === 'direct')      yLabel = yBase + '²' + yUnitSuffix;
-  else if (gapType === 'indirect') yLabel = yBase + '^½' + yUnitSuffix;
-  else                             yLabel = yBase + '^⅔' + yUnitSuffix;
+  let yExp;
+  if (gapType === 'direct')      yExp = '²';
+  else if (gapType === 'indirect') yExp = '^½';
+  else                             yExp = '^⅔';
+  const yLabel = yBase + yExp + (hasThickness ? ' (eV/cm)' + yExp : ' (a.u.)');
 
   const datasets = [
     {
-      label: '(αhν)¹/ⁿ',
+      label: '(αhν)ⁿ',
       data: allPoints.map(p => ({ x: p.hv, y: p.y })),
       backgroundColor: cBlue, borderColor: cBlue,
       pointRadius: ptSize, pointHoverRadius: ptSize + 3.5,
@@ -1018,6 +1033,7 @@ function exportCSV() {
   const dataType = getDataType();
   const gapType = document.getElementById('gap-type').value;
   const thickness = getFilmThickness();
+  const thicknessUnit = getThicknessUnit();
   const reflectance = getReflectance();
   const colLabel = getValueColumnLabel();
   let header = `波长(nm),${colLabel},hν(eV),α`;
@@ -1027,7 +1043,7 @@ function exportCSV() {
   const lines = [header];
   for (const [wl, rawVal] of data) {
     const hv = 1240 / wl;
-    const alphaRel = computeAlpha(rawVal, dataType, thickness, reflectance);
+    const alphaRel = computeAlpha(rawVal, dataType, thickness, thicknessUnit, reflectance);
     if (alphaRel === null) continue;
     let exponent;
     if (gapType === 'direct') exponent = 2;

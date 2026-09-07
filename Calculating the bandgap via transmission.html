@@ -194,7 +194,7 @@
   <section class="card">
     <div class="sec-head">
       <span class="sec-no">03</span>
-      <div class="sec-body"><h2>📄 文件与厚度</h2><p>每个文件一行：识别情况与数据行数；厚度 d 单独设置，单位可选 nm / μm / cm</p></div>
+      <div class="sec-body"><h2>📄 文件与厚度</h2><p>每个文件一行：识别情况与数据行数；厚度 d 单独设置，单位 nm / μm / cm 任选（计算时统一换算为 cm，α 单位为 cm⁻¹）</p></div>
     </div>
     <ul id="fileList" class="filelist"></ul>
     <p id="emptyMsg" class="empty">尚未上传文件 —— 上传后这里会列出每个文件的识别结果</p>
@@ -211,7 +211,7 @@
     </div>
     <ul class="report-list">
       <li><span class="mono">报表1_Tauc数据</span>：hν、(αhν)ⁿ</li>
-      <li><span class="mono">报表2_完整数据</span>：λ、T、d、α = -ln(T/100)/d、hν、(αhν)ⁿ</li>
+      <li><span class="mono">报表2_完整数据</span>：λ、T、d、α = -ln(T/100)/d（cm⁻¹）、hν、(αhν)ⁿ</li>
     </ul>
     <p id="exportMsg" class="export-msg"></p>
   </section>
@@ -221,7 +221,7 @@
 
 <footer>
   <p class="f1">α = -ln(T/100)/d &nbsp;·&nbsp; hν = 1240/λ(nm) &nbsp;·&nbsp; (αhν)ⁿ</p>
-  <p>T 以 % 计（文件为 0–1 小数时自动 ×100）；λ 单位 nm/μm 自动识别；自动剔除 T≤0、λ≤0 的行；T&gt;100% 的行保留并计入 α（为负值）</p>
+  <p>T 以 % 计（文件为 0–1 小数时自动 ×100）；λ 单位 nm/μm 自动识别；d 按所选单位输入、计算时统一换算为 cm（α 单位 cm⁻¹）；自动剔除 T≤0、λ≤0 的行；T&gt;100% 的行保留并计入 α（为负值）</p>
 </footer>
 
 <script>
@@ -359,14 +359,18 @@ function parseSpectrum(text, opts){
   return out;
 }
 
-/* 计算：hv(eV)、α、y=(αhν)^n。d 为正数（单位与参数一致），n 为正数 */
-function computeTauc(parsed, d, n, unitOverride){
+/* 计算：hv(eV)、α(cm⁻¹)、y=(αhν)^n。
+   d 按用户所选单位（dUnit: 'nm'|'um'|'cm'）统一换算成 cm 后再计算 α，
+   同一物理厚度用不同单位输入，α 与 y 数值完全一致。 */
+function computeTauc(parsed, d, dUnit, n, unitOverride){
   var unit = (unitOverride && unitOverride !== 'auto') ? unitOverride : parsed.unit;
+  var factor = dUnit === 'nm' ? 1e-7 : (dUnit === 'um' ? 1e-4 : 1);
+  var dCm = d * factor;
   var hv = [], alpha = [], y = [];
   for (var i = 0; i < parsed.lambda.length; i++){
     var lamNm = (unit === 'um') ? parsed.lambda[i] * 1000 : parsed.lambda[i];
     var h = 1240 / lamNm;
-    var a = -Math.log(parsed.trans[i] / 100) / d;
+    var a = -Math.log(parsed.trans[i] / 100) / dCm;
     hv.push(h);
     alpha.push(a);
     y.push(Math.pow(a * h, n));
@@ -387,14 +391,14 @@ function report1Aoa(res){
   for (var i = 0; i < res.hv.length; i++) aoa.push([res.hv[i], numOrErr(res.y[i])]);
   return aoa;
 }
-/* 报表2：λ、T、d、α=-ln(T/100)/d、hν、(αhν)^n */
+/* 报表2：λ、T、d、α=-ln(T/100)/d（d 已换算 cm，α 单位 cm⁻¹）、hν、(αhν)^n */
 function report2Aoa(res, parsed, d, dUnit){
   var u = res.lamUnit;
   var aoa = [[
     u === 'um' ? 'λ (μm)' : 'λ (nm)',
     'T (%)',
     'd (' + unitName(dUnit) + ')',
-    'α = -ln(T/100)/d (' + unitName(dUnit) + '⁻¹)',
+    'α = -ln(T/100)/d (cm⁻¹)',
     'hν (eV)',
     '(αhν)^n'
   ]];
@@ -733,7 +737,7 @@ function isBinaryText(text){
       var b = base, k = 2;
       while (used[b]){ b = base + '_' + k; k++; }
       used[b] = true;
-      var res = computeTauc(f.parsed, f.d, nVal, lamUnitSel.value);
+      var res = computeTauc(f.parsed, f.d, f.dUnit, nVal, lamUnitSel.value);
       zip.file(b + '_报表1_Tauc数据.xlsx',
         aoaToWorkbookArray(report1Aoa(res), '报表1_Tauc数据'));
       zip.file(b + '_报表2_完整数据.xlsx',

@@ -87,6 +87,13 @@
   .chip { font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 11px; white-space: nowrap; }
   .chip-ok { background: #ecfdf5; color: #059669; }
   .chip-err { background: #fef2f2; color: #dc2626; }
+  .f-del {
+    flex-shrink: 0; width: 28px; height: 28px;
+    border: 1px solid transparent; border-radius: 6px;
+    background: transparent; color: #94a3b8;
+    font-size: 14px; line-height: 1; cursor: pointer; transition: all .15s;
+  }
+  .f-del:hover { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
   .empty { color: #64748b; font-size: 14px; padding: 6px 2px; }
   /* ---------- export ---------- */
   .export-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
@@ -194,7 +201,7 @@
   <section class="card">
     <div class="sec-head">
       <span class="sec-no">03</span>
-      <div class="sec-body"><h2>📄 文件与厚度</h2><p>每个文件一行：识别情况与数据行数；厚度 d 单独设置，单位 nm / μm / cm 任选（计算时统一换算为 cm，α 单位为 cm⁻¹）</p></div>
+      <div class="sec-body"><h2>📄 文件与厚度</h2><p>每个文件一行：识别情况与数据行数；厚度 d 单独设置，单位 nm / μm / cm 任选（计算时统一换算为 cm，α 单位为 cm⁻¹）；误选可点 ✕ 移除</p></div>
     </div>
     <ul id="fileList" class="filelist"></ul>
     <p id="emptyMsg" class="empty">尚未上传文件 —— 上传后这里会列出每个文件的识别结果</p>
@@ -203,7 +210,7 @@
   <section class="card">
     <div class="sec-head">
       <span class="sec-no">04</span>
-      <div class="sec-body"><h2>📤 导出报表</h2><p>每个文件生成两个独立 xlsx，全部打包为一个 zip</p></div>
+      <div class="sec-body"><h2>📤 导出报表</h2><p>每个文件生成两个独立 xlsx（报表名 = 原文件名 + 年月日时分秒），全部打包为一个 zip</p></div>
     </div>
     <div class="export-row">
       <button id="dlBtn" class="btn-primary" disabled>下载全部报表（zip）</button>
@@ -557,6 +564,12 @@ function isBinaryText(text){
       var li = document.createElement('li');
       var main = document.createElement('div');
       main.className = 'f-main';
+      var delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'f-del';
+      delBtn.title = '移除该文件';
+      delBtn.textContent = '✕';
+      delBtn.addEventListener('click', function(){ removeFile(f); });
 
       var name = document.createElement('div');
       name.className = 'f-name';
@@ -587,6 +600,7 @@ function isBinaryText(text){
         main.appendChild(rawPrev);
         li.appendChild(main);
         li.appendChild(chip);
+        li.appendChild(delBtn);
         fileList.appendChild(li);
         return;
       } else {
@@ -631,6 +645,7 @@ function isBinaryText(text){
         main.appendChild(dg);
         li.appendChild(main);
         li.appendChild(chip);
+        li.appendChild(delBtn);
         fileList.appendChild(li);
         return;
       }
@@ -642,6 +657,13 @@ function isBinaryText(text){
     } else {
       dlBtn.textContent = '下载全部报表（zip）';
     }
+  }
+
+  /* 从列表中移除误选的文件 */
+  function removeFile(f){
+    var i = files.indexOf(f);
+    if (i >= 0){ files.splice(i, 1); }
+    renderList();
   }
 
   function formatSize(b){
@@ -706,9 +728,11 @@ function isBinaryText(text){
     var b = String(name || '').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|\s]+/g, '_');
     return b || 'data';
   }
+  /* 年月日时分秒编号（如 20260907153045） */
   function timestamp(){
     var d = new Date(), p = function(x){ return (x < 10 ? '0' : '') + x; };
-    return '' + d.getFullYear() + p(d.getMonth()+1) + p(d.getDate()) + '_' + p(d.getHours()) + p(d.getMinutes());
+    return '' + d.getFullYear() + p(d.getMonth()+1) + p(d.getDate())
+      + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
   }
   dlBtn.addEventListener('click', function(){
     exportMsg.className = 'export-msg';
@@ -732,22 +756,23 @@ function isBinaryText(text){
 
     var zip = new JSZip();
     var used = {};
+    var ts = timestamp();
     okFiles.forEach(function(f){
       var base = sanitizeBase(f.name);
       var b = base, k = 2;
       while (used[b]){ b = base + '_' + k; k++; }
       used[b] = true;
       var res = computeTauc(f.parsed, f.d, f.dUnit, nVal, lamUnitSel.value);
-      zip.file(b + '_报表1_Tauc数据.xlsx',
+      zip.file(b + '_' + ts + '_报表1_Tauc数据.xlsx',
         aoaToWorkbookArray(report1Aoa(res), '报表1_Tauc数据'));
-      zip.file(b + '_报表2_完整数据.xlsx',
+      zip.file(b + '_' + ts + '_报表2_完整数据.xlsx',
         aoaToWorkbookArray(report2Aoa(res, f.parsed, f.d, f.dUnit), '报表2_完整数据'));
     });
     exportMsg.textContent = '正在打包 ' + (okFiles.length * 2) + ' 个 xlsx …';
     zip.generateAsync({ type: 'blob' }).then(function(blob){
       var a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = '带隙报表_' + timestamp() + '.zip';
+      a.download = '带隙报表_' + ts + '.zip';
       document.body.appendChild(a);
       a.click();
       setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
